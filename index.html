@@ -228,6 +228,24 @@ input.bl{width:72px;text-align:center}
 table.res{border-collapse:collapse;font-size:.9rem} table.res td,table.res th{padding:5px 12px;border-bottom:1px solid var(--line);text-align:left}
 .dash2{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
 .card-w{border:1px solid var(--line);border-radius:10px;padding:14px}
+.sheet.home{width:min(1000px,100%)}
+.weeks{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.wk{border:1px solid var(--line);border-radius:12px;padding:16px;display:grid;gap:8px;align-content:start;background:var(--surface)}
+.wk h2{font-size:1.25rem}
+.chips{display:flex;flex-wrap:wrap;gap:4px}.chips span{font:500 .68rem var(--mono);background:var(--sunk);border-radius:999px;padding:2px 8px}
+.howto{max-width:420px}
+.bin-it.ok{outline:2px solid #1E8556} .bin-it.no{outline:2px solid #C2412D}
+.mock{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff;color:#1d2433}
+.mock-bar{display:flex;gap:5px;align-items:center;padding:6px 10px;background:#E7EBF1}.mock-bar span{width:9px;height:9px;border-radius:50%;background:#C5CCD7}.mock-bar em{font:500 .7rem var(--mono);color:#6b7486;margin-left:8px;font-style:normal}
+.mock-body{padding:14px;display:grid;gap:10px}
+.mock-plans{display:grid;grid-template-columns:1fr 1fr;gap:10px}@media (max-width:560px){.mock-plans{grid-template-columns:1fr}}
+.mock-plan{border:1px solid #d8dee8;border-radius:10px;padding:10px;display:grid;gap:6px}.mock-plan.pro{border-color:#F0A43A}
+.hs{text-align:left;border:1px dashed transparent;background:#f6f8fb;color:#1d2433;border-radius:6px;padding:8px 10px;font-size:.88rem}
+.hs:hover:not(:disabled){border-color:#2D5BD8}
+.hs.mock-h{font:800 1.05rem var(--display);background:transparent}
+.hs.mock-tiny{font-size:.68rem;color:#9aa3b2;background:transparent}
+.hs.flag{border-color:#C2412D;background:#FBE9E6}.hs.hit{border:2px solid #1E8556;background:#DDF2E7}.hs.miss{border:2px dashed #C2412D}.hs.wrong{border:2px solid #C2412D;background:#FBE9E6}
+.hs-why{display:block;font-size:.75rem;color:#4a5568;margin-top:3px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 
@@ -340,12 +358,12 @@ function fresh(){return{
 let S=fresh();
 const loadKey=k=>{ try{ return JSON.parse(localStorage.getItem(k)); }catch{ return null; } };
 let CHECKPOINT=loadKey(KEY+"-cp"), AUTO=loadKey(KEY+"-auto");
-function checkpoint(){ S.pos=[P.x,P.y]; try{ localStorage.setItem(KEY+"-cp", JSON.stringify(S)); }catch{} CHECKPOINT=JSON.parse(JSON.stringify(S)); saveNow(); }
+function checkpoint(){ S.pos=[P.x,P.y]; try{ localStorage.setItem(cpKey(S.week), JSON.stringify(S)); }catch{} CHECKPOINT=JSON.parse(JSON.stringify(S)); saveNow(); }
 function saveNow(){
   if(S.stage!=="play") return;
   S.pos=[P.x,P.y]; S.savedAt=Date.now();
   const el=document.getElementById("saved");
-  try{ localStorage.setItem(KEY+"-auto", JSON.stringify(S)); if(el) el.textContent="Saved "+fmt(S.min); }
+  try{ localStorage.setItem(slotKey(S.week), JSON.stringify(S)); if(el) el.textContent="Saved "+fmt(S.min); }
   catch{ if(el) el.textContent="Can't autosave here. Use Save file."; }
 }
 setInterval(saveNow,5000);
@@ -370,10 +388,10 @@ function goal(id,st="done"){ if(S.goals[id]) return; S.goals[id]=st; renderSide(
 
 /* ================= Claude ================= */
 let sample=null, aiState="checking";
-(async()=>{ try{ if(window.claude&&window.claude.use) sample=await window.claude.use("sample"); }catch{} aiState=sample?"on":"off"; renderHUD(); if(S.stage==="intro") renderIntro(); })();
+(async()=>{ try{ if(window.claude&&window.claude.use) sample=await window.claude.use("sample"); }catch{} aiState=sample?"on":"off"; renderHUD(); if(S.stage==="intro") renderHome(); })();
 let NOAI=false; try{ NOAI=!!localStorage.getItem(KEY+"-noai"); }catch{}
 const aiOn=()=>aiState==="on"&&!NOAI;
-setTimeout(()=>{ if(aiState==="checking"){aiState="off";renderHUD();if(S.stage==="intro")renderIntro();} },11000);
+setTimeout(()=>{ if(aiState==="checking"){aiState="off";renderHUD();if(S.stage==="intro")renderHome();} },11000);
 function aiFail(e){
   const c=e&&e.code;
   if(["not_granted","sampling_disabled","not_declared","capability_disabled","capability_removed"].includes(c)){ aiState="off"; sample=null; renderHUD(); return "AI characters are off for this page, so we switched to scripted replies."; }
@@ -603,7 +621,7 @@ function targetPos(g){ if(!g) return null; const w=g.where; if(w==="desk") retur
 function hasNews(id){
   const d=S.day, gl=S.goals;
   if(id==="maya") return false;
-  if(S.week===1) return hasNewsW2(id);
+  if(S.week>0) return WK[S.week].hasNews(id);
   if(d===0&&id==="sam"&&!gl.mon_sam) return true;
   if(d===1&&id==="priya"&&gl.tue_interview==="done"&&!gl.tue_priya) return true;
   if(d===2&&id==="leo"&&!gl.wed_leo&&hasDeliveryPin()) return true;
@@ -730,7 +748,7 @@ function renderHUD(){
     </div>
     <div class="meters" id="meters">${METERS.map(([k,l,h])=>`<div class="meter" title="${esc(h)}">${l}<b>${S.meters[k]}</b><i><u style="width:${S.meters[k]}%"></u></i></div>`).join("")}</div>
     <div class="row"><span class="ib" style="border:0;background:var(--sunk)">Week ${S.week+1} · ${aiOn()?"AI cast on":aiState==="checking"&&!NOAI?"…":"Scripted"}</span>
-    <button class="ib" data-act="glossary">Glossary</button>${S.stage==="play"?`<button class="ib" data-act="export" title="Download your progress as a file">Save file</button><span class="small muted" id="saved"></span>`:""}</div>`;
+    <button class="ib" data-act="glossary">Glossary</button>${S.stage==="play"?`<button class="ib" data-act="home" title="Save and go to the home page">Home</button><button class="ib" data-act="export" title="Download your progress as a file">Save file</button><span class="small muted" id="saved"></span>`:""}</div>`;
 }
 function renderClock(){ const el=document.getElementById("clock-t"); if(el) el.textContent=`${DAYNAMES[S.day].slice(0,3)} ${fmt(S.min)}${S.paused?" · paused":""}`; }
 function renderSide(){
@@ -780,7 +798,7 @@ const SMALL={
 function talk(id){
   const d=S.day, gl=S.goals, F=S.flags;
   if(id==="maya") return {text:"Hey! Want a hint for what to do next?",choices:[{l:"Yes, what should I do next?",go:hintNode},{l:"What does a PM actually do?",go:()=>end(`A ${t("pm")} decides what the team builds and why. You don't manage anyone: you earn ${t("stakeholder","stakeholders'")} trust with evidence and clear reasoning. That's what the Trust meter tracks.`)}]};
-  if(S.week===1){ const r=talkW2(id); if(r) return r; const ln=SMALL[id]||["Hi!"]; return end(ln[Math.floor(S.min)%ln.length]); }
+  if(S.week>0){ const r=WK[S.week].talk(id); if(r) return r; const ln=SMALL[id]||["Hi!"]; return end(ln[Math.floor(S.min)%ln.length]); }
   if(d===0&&id==="sam"&&!gl.mon_sam) return {text:"Hi! You're the new PM? Honestly the queue is wild right now. Lots of 'my client never got their reminder' tickets.",choices:[
     {l:"Can you export ticket counts by topic for the last 6 months? I want to dig in.",go:()=>{F.tickets=true;goal("mon_sam");bump("trust",4,"asked Support for data");bump("customers",3,"listening to customer pain");return end("On it! You'll find it in Analytics on your laptop.");}},
     {l:"Sounds like a bug. Can you file it with engineering?",go:()=>{goal("mon_sam");bump("trust",-3,"passed off a clue");return end("…Sure. I've filed a few already.");}}]};
@@ -804,7 +822,8 @@ function talk(id){
 }
 function askLeave(){
   const req=goalsToday().filter(g=>!g.optional&&!S.goals[g.id]);
-  if(S.day===4&&!S.goals[S.week?"w2_allhands":"fri_exec"]) { UI.dialog={id:"maya",node:end(S.week?"Not yet! All-hands is at 4pm and you're presenting.":"Not yet! You're presenting to Dana at 3pm.")}; renderDialog(); return; }
+  const mustG=S.week?WK[S.week].must:["fri_exec","Not yet! You're presenting to Dana at 3pm."];
+  if(S.day===4&&!S.goals[mustG[0]]) { UI.dialog={id:"maya",node:end(mustG[1])}; renderDialog(); return; }
   UI.dialog={id:"maya",node:{text:req.length?`Heading out? You still have ${req.length} goal${req.length>1?"s":""} open today. Leaving now marks ${req.length>1?"them":"it"} missed.`:"Nice work today. Ready to head home?",choices:[{l:"Head home",go:()=>{UI.dialog=null;renderDialog();endDay();return null;}}]}};
   renderDialog();
 }
@@ -1046,12 +1065,12 @@ function sceneExec(){
 
 /* ================= Laptop ================= */
 const APPS=[["calendar","Calendar"],["analytics","Analytics"],["docs","Docs"],["board","Board"],["release","Release"]];
-function apps(){ return S.week===1?[["calendar","Calendar"],["analytics","Analytics"],["docs","Docs"],["experiments","Experiments"],["board","Board"]]:APPS; }
-function appHot(a){ if(S.week===1) return appHotW2(a); const d=S.day,gl=S.goals; return (a==="calendar"&&d===0&&!gl.mon_book)||(a==="docs"&&((d===1&&gl.tue_interview==="done"&&!gl.tue_research)||(d===2&&!gl.wed_hyp)||(d===4&&!gl.fri_prd)))||(a==="analytics"&&d===2&&!gl.wed_pins)||(a==="board"&&d===3&&!gl.thu_matrix)||(a==="release"&&d===4&&S.min>=600&&!gl.fri_ship); }
+function apps(){ return S.week>0?WK[S.week].apps:APPS; }
+function appHot(a){ if(S.week>0) return WK[S.week].appHot(a); const d=S.day,gl=S.goals; return (a==="calendar"&&d===0&&!gl.mon_book)||(a==="docs"&&((d===1&&gl.tue_interview==="done"&&!gl.tue_research)||(d===2&&!gl.wed_hyp)||(d===4&&!gl.fri_prd)))||(a==="analytics"&&d===2&&!gl.wed_pins)||(a==="board"&&d===3&&!gl.thu_matrix)||(a==="release"&&d===4&&S.min>=600&&!gl.fri_ship); }
 function openPC(app,locked){
   UI.pc={locked:!!locked}; UI.app=app||apps().find(([a])=>appHot(a))?.[0]||"calendar";
-  if(UI.app==="docs") UI.docTab = S.week===1 ? (S.day===2&&!S.goals.w2_pm?"pm":"writing") : S.day===1?"research":S.day===2?"hyp":S.day===4?"prd":UI.docTab||"research";
-  if(UI.app==="board") UI.boardTab = S.week===1?"roadmap":locked?"sprint":"matrix";
+  if(UI.app==="docs") UI.docTab = S.week>0 ? WK[S.week].docTab() : S.day===1?"research":S.day===2?"hyp":S.day===4?"prd":UI.docTab||"research";
+  if(UI.app==="board") UI.boardTab = S.week>0?WK[S.week].boardTab():locked?"sprint":"matrix";
   renderPC(); tips("pc");
 }
 function closePC(){ UI.pc=null; UI.sel=null; renderPC(); }
@@ -1070,14 +1089,14 @@ function renderApp(){
   const sc=el.scrollTop;
   el.innerHTML=({calendar:appCalendar,analytics:appAnalytics,docs:appDocs,board:appBoard,release:appRelease,experiments:appExperiments})[UI.app]();
   el.scrollTop=sc;
-  const tipKey=S.week===1?({analytics:"measure",docs:UI.docTab==="pm"?"postmortem":"wc",experiments:"experiments",board:"roadmap"})[UI.app]:UI.app==="docs"?{research:"research",hyp:"hyp",prd:"prd"}[UI.docTab]:UI.app==="board"?UI.boardTab:UI.app;
+  const tipKey=S.week>0?WK[S.week].tipKey():UI.app==="docs"?{research:"research",hyp:"hyp",prd:"prd"}[UI.docTab]:UI.app==="board"?UI.boardTab:UI.app;
   if(tipKey && appRelevant()) setTimeout(()=>tips(tipKey),60);
 }
-function appRelevant(){ const a=UI.app,d=S.day; if(S.week===1) return appHotW2(a); if(a==="calendar") return d===0; if(a==="analytics") return d>=2; if(a==="docs") return (UI.docTab==="research"&&d>=1)||(UI.docTab==="hyp"&&d>=2)||(UI.docTab==="prd"&&d>=4); if(a==="board") return d>=3&&(UI.boardTab==="matrix"||UI.pc.locked); if(a==="release") return d===4&&S.min>=600&&sprintHas("t1"); return false; }
+function appRelevant(){ const a=UI.app,d=S.day; if(S.week>0) return WK[S.week].appHot(a); if(a==="calendar") return d===0; if(a==="analytics") return d>=2; if(a==="docs") return (UI.docTab==="research"&&d>=1)||(UI.docTab==="hyp"&&d>=2)||(UI.docTab==="prd"&&d>=4); if(a==="board") return d>=3&&(UI.boardTab==="matrix"||UI.pc.locked); if(a==="release") return d===4&&S.min>=600&&sprintHas("t1"); return false; }
 
 /* --- Calendar --- */
 function appCalendar(){
-  if(S.week===1) return appCalendarW2();
+  if(S.week>0) return WK[S.week].calendar();
   const at=S.flags.interviewAt, canBook=S.day===0&&!at;
   const ev=(d,h)=>{ // returns html for cell
     if(d===0&&h===9) return `<div class="ev ${S.day===0?"today":""}">9:30 Standup</div>`;
@@ -1131,7 +1150,7 @@ function chartFor(a){
 function pinStrength(id){ const [m,sp,r]=id.split("|"); if(m==="signups") return [false,"Sign-ups are flat. This doesn't explain why people leave."]; if(m==="churn"&&sp==="none"&&r==="3") return [true,"Shows the jump, but 6 months shows the 'before' more clearly."]; if(sp==="size") return [true,"Small businesses churn 5× more than large clinics."]; if(sp==="rem") return [true,"Customers who use reminders churn almost 3× more."]; return [true,{churn:"Shows exactly when churn jumped.",delivery:"Delivery dropped the same month churn jumped.",tickets:"Reminder complaints exploded in August."}[m]]; }
 const hasDeliveryPin=()=>S.pins.some(p=>p.id.startsWith("delivery"));
 function appAnalytics(){
-  if(S.week===1) return appAnalyticsW2();
+  if(S.week>0) return WK[S.week].analytics();
   const a=UI.an; const locked=a.metric==="tickets"&&!S.flags.tickets;
   const c=locked?{svg:`<p class="muted">Support hasn't shared this data yet. Ask Sam.</p>`,id:null}:chartFor(a);
   const pinned=c.id&&S.pins.some(p=>p.id===c.id);
@@ -1154,7 +1173,7 @@ const CLUSTERS=[["reminders","Reminders & no-shows"],["price","Price"],["product
 function allNotes(){ const n=[...S.notes]; if(S.flags.tickets) n.push({id:"sam1",text:"Ticket: \"My client never got their reminder text\" (142 tickets in September)",src:"Support",c:"reminders"}); n.push({id:"jor1",text:"Sales: lost 2 deals to Slotwise \"on price\"",src:"Sales",c:"price"}); n.push({id:"sam2",text:"Ticket: \"I contacted support twice and nothing changed\"",src:"Support",c:"support"}); return n; }
 const INSIGHTS=["Unreliable reminder texts cause no-shows, so small businesses leave","Customers think we're too expensive","Customers want AI features","The calendar is hard to use"];
 function appDocs(){
-  if(S.week===1) return appDocsW2();
+  if(S.week>0) return WK[S.week].docs();
   const tab=UI.docTab||"research";
   const tabs=`<div class="row">${[["research","Research board"],["hyp","Hypothesis"],["prd","PRD"]].map(([k,l])=>`<button class="ib ${tab===k?"on":""}" data-act="doc-tab" data-t="${k}">${l}</button>`).join("")}</div>`;
   if(tab==="research"){
@@ -1236,7 +1255,7 @@ const TICKETS=[["t1","Switch to a reliable SMS provider",5,"sms"],["t2","Deliver
 const sprintHas=id=>!!S.sprint[id];
 const sprintPts=()=>TICKETS.filter(t=>S.sprint[t[0]]).reduce((a,t)=>a+t[2],0);
 function appBoard(){
-  if(S.week===1) return appRoadmap();
+  if(S.week>0) return WK[S.week].board();
   const tab=UI.boardTab||"matrix";
   const tabs=`<div class="row">${[["matrix","Prioritize"],["sprint","Sprint"]].map(([k,l])=>`<button class="ib ${tab===k?"on":""}" data-act="board-tab" data-t="${k}" ${UI.pc.locked&&k!=="sprint"?"disabled":""}>${l}</button>`).join("")}</div>`;
   if(tab==="matrix"){
@@ -1301,7 +1320,7 @@ function endDay(){
   if(UI.summary) return;
   goalsToday().forEach(g=>{ if(!S.goals[g.id]) S.goals[g.id]="failed"; });
   if(UI.pc) closePC(); UI.dialog=null; renderDialog(); UI.scene=null; renderScene();
-  S.dayEnded=true; saveNow();
+  S.dayEnded=true; if(S.day===4) markWeekDone(); saveNow();
   UI.summary={kind:S.day===4?"week":"end"}; renderSummary(); renderSide();
 }
 const SENIOR=[
@@ -1326,9 +1345,9 @@ function renderSummary(){
     html=`<span class="eyebrow">${DAYNAMES[S.day]} · end of day</span><h1>${k==="week"?`End of Week ${S.week+1}`:"Day done"}</h1>
     <div class="stack"><span class="eyebrow">Goals</span><div class="daygoals">${d.goals.map(g=>`<div>${S.goals[g.id]==="done"?"✅":g.optional?"➖":"❌"} ${goalText(g)}</div>`).join("")}</div></div>
     <div class="row">${Object.entries(sum).map(([m,v])=>v?dtag(m,v):"").join(" ")||'<span class="muted small">No meter changes today.</span>'}</div>
-    ${sayHTML("maya",`<b>What a senior PM would have done today:</b> ${(S.week?SENIOR2:SENIOR)[S.day]}`)}
-    ${k==="week"?(S.week?weekReport2():weekReport()):""}
-    <div class="row">${k==="week"?(S.week===0?`<button class="btn primary" data-act="start-w2">Start Week 2 →</button> <button class="btn ghost" data-act="restart-yes">Play Week 1 again</button>`:`<button class="btn primary" data-act="restart-yes">Back to the start</button>`):`<button class="btn primary" data-act="day-next">Go to ${DAYNAMES[S.day+1]} →</button>`}</div>`;
+    ${sayHTML("maya",`<b>What a senior PM would have done today:</b> ${(S.week?WK[S.week].senior:SENIOR)[S.day]}`)}
+    ${k==="week"?(S.week?WK[S.week].report():weekReport()):""}
+    <div class="row">${k==="week"?`${S.week<WEEKS.length-1?`<button class="btn primary" data-act="next-week">Start Week ${S.week+2} →</button>`:""} <button class="btn ghost" data-act="home">Home</button>`:`<button class="btn primary" data-act="day-next">Go to ${DAYNAMES[S.day+1]} →</button>`}</div>`;
   }
   root.innerHTML=`<div class="scrim"><div class="sheet" role="dialog">${html}</div></div>`;
 }
@@ -1418,16 +1437,16 @@ const ACT={
   "coach-next":()=>{ UI.coach.i++; if(UI.coach.i>=TIPS[UI.coach.key].length) UI.coach=null; renderCoach(); },
   "coach-skip":()=>{ UI.coach=null; renderCoach(); },
   begin:()=>{ startWeek(0,false); },
-  continue:()=>{ S=CHECKPOINT; DAYS=S.week===1?WEEK2:WEEK1; startDay(); },
-  "day-go":()=>{ UI.summary=null; renderSummary(); const dd=DAYS[S.day]; if(dd.onStart&&!S.goals.w2_incident) dd.onStart(); else if(S.day===0) tips("office"); },
+  continue:()=>{ S=CHECKPOINT; DAYS=WEEKS[S.week]; startDay(); },
+  "day-go":()=>{ UI.summary=null; renderSummary(); const dd=DAYS[S.day]; if(dd.onStart&&!S.goals[dd.startGoal]) dd.onStart(); else if(S.day===0) tips("office"); },
   "day-next":()=>{ UI.summary=null; S.day++; startDay(); },
-  "restart-yes":()=>{ UI.summary=null; S=fresh(); DAYS=WEEK1; AUTO=loadKey(KEY+"-auto"); CHECKPOINT=null; try{localStorage.removeItem(KEY+"-cp");}catch{} render(); },
+  "restart-yes":()=>{ goHome(); return; UI.summary=null; S=fresh(); DAYS=WEEK1; CHECKPOINT=null; try{localStorage.removeItem(KEY+"-cp");}catch{} render(); },
   "read-msg":el=>{ const m=S.msgs[+el.dataset.i]; if(m&&m.unread){ m.unread=false; renderSide(); } },
   reply:el=>{ const m=S.msgs[+el.dataset.i], c=MSG[m.id].choices[+el.dataset.j]; m.picked=+el.dataset.j; m.unread=false; fx(c.fx); if(c.set) Object.assign(S.flags,c.set); if(c.goal) goal(c.goal); renderSide(); },
   dlg:el=>{ const c=UI.dialog.node.choices[+el.dataset.i]; const nx=c.go(); if(nx){ UI.dialog.node=nx; renderDialog(); } },
   "dlg-close":()=>{ UI.dialog=null; renderDialog(); },
   "pc-close":()=>closePC(),
-  app:el=>{ UI.app=el.dataset.a; UI.sel=null; if(UI.app==="docs") UI.docTab=S.week===1?(S.day===2&&!S.goals.w2_pm?"pm":"writing"):S.day===1?"research":S.day===2?"hyp":S.day===4?"prd":"research"; if(UI.app==="board"&&S.week===1) UI.boardTab="roadmap"; renderPC(); },
+  app:el=>{ UI.app=el.dataset.a; UI.sel=null; if(UI.app==="docs") UI.docTab=S.week>0?WK[S.week].docTab():S.day===1?"research":S.day===2?"hyp":S.day===4?"prd":"research"; if(UI.app==="board"&&S.week>0) UI.boardTab=WK[S.week].boardTab(); renderPC(); },
   "doc-tab":el=>{ UI.docTab=el.dataset.t; UI.sel=null; rerender(); },
   "board-tab":el=>{ UI.boardTab=el.dataset.t; UI.sel=null; rerender(); },
   "cal-slot":el=>{ UI.calPick=+el.dataset.m; UI.inviteP=!!S.flags.priyaPromised; renderApp(); },
@@ -1634,7 +1653,7 @@ const WEEK2=[
    {id:"w2_jordan",text:"Ask Jordan what customers say about price",optional:true,where:"jordan",hint:"Sales talks to customers about money every day. Ask before Thursday's pricing review."}],
   events:[[541,()=>pushMsg("w2_tue_maya")],[720,()=>pushMsg("w2_tue_dana")]],
   meetings:[{id:"usab",room:"booth",at:()=>600,goal:"w2_usability",scene:()=>sceneUsability(),miss:()=>{bump("customers",-4,"missed the usability test");}}]},
- {title:"2 a.m.", startMin:600, onStart:()=>sceneIncident(), maya:"It's 2:07 am. Your phone is buzzing.",
+ {title:"2 a.m.", startMin:600, startGoal:"w2_incident", onStart:()=>sceneIncident(), maya:"It's 2:07 am. Your phone is buzzing.",
   goals:[
    {id:"w2_incident",text:"Handle the 2 a.m. outage",hint:"Done overnight."},
    {id:"w2_pm",text:"Write a blameless postmortem (Docs)",where:"desk",hint:"Docs → Postmortem. Order the timeline, remove blame, and pick action items that fix the system, not the person."},
@@ -1984,7 +2003,7 @@ Object.assign(ACT,{
   "road-check":()=>{ const w=W2(); const good=ROAD.filter(r=>r.ok.includes(w.road[r.id])).length; goal("w2_roadmap"); bump(good>=6?"velocity":"trust",good>=6?6:-2,`roadmap ${good}/8 agreed`); renderApp(); },
   "start-w2":()=>{ startWeek(1,true); },
   "begin-w2":()=>{ startWeek(1,false); },
-  "noai":el=>{ NOAI=el.checked; try{localStorage.setItem(KEY+"-noai",NOAI?"1":"");}catch{} renderHUD(); renderIntro(); },
+  "noai":el=>{ NOAI=el.checked; try{localStorage.setItem(KEY+"-noai",NOAI?"1":"");}catch{} renderHUD(); renderHome(); },
 });
 DROP.retro=(id,z)=>{ const w=W2(); w.retro ||= {}; if(z) w.retro[id]=z; else delete w.retro[id]; UI.sel=null; rerender(); };
 DROP.road=(id,z)=>{ const w=W2(); w.road ||= {}; if(S.goals.w2_roadmap) return; const cap=(RCOLS.find(c=>c[0]===z)||[])[2]; if(z&&cap&&ROAD.filter(r=>w.road[r.id]===z&&r.id!==id).length>=cap){ toast(`${RCOLS.find(c=>c[0]===z)[1]} is full (max ${cap}). Move something out first.`); UI.sel=null; rerender(); return; } if(z) w.road[id]=z; else delete w.road[id]; UI.sel=null; rerender(); };
@@ -1997,17 +2016,451 @@ document.addEventListener("change",e=>{ const el=e.target; if(el.dataset.act==="
 
 function startWeek(wk,carry){
   const meters=carry?{...S.meters}:null;
-  S=fresh(); S.week=wk; if(meters) S.meters=meters; if(wk===1&&!carry) S.meters={trust:60,customers:60,velocity:55,revenue:55};
-  DAYS=wk===1?WEEK2:WEEK1; UI.summary=null; S.day=0; startDay();
+  S=fresh(); S.week=wk; S.meters=meters||{...WEEKMETA[wk].meters};
+  DAYS=WEEKS[wk]; UI.summary=null; S.day=0; startDay();
 }
 
-if(S.week===1) DAYS=WEEK2;
+
+/* =====================================================================
+   WEEK 3 — Strategy & launch (fully scripted). New mechanics:
+   sort-into-bins (incl. timed), click-the-problem on a mockup,
+   budget sliders, live launch dashboard.
+   ===================================================================== */
+const W3=()=>(S.w3 ||= {});
+const WX=()=>S.week===2?W3():W2();   // state bag for the shared generic components
+
+/* ---------- Generic: sort items into bins ---------- */
+const BIN={
+  w3_okr:{prompt:"Drag each statement into the right box (or tap it, then tap a box).",bins:[["obj","Objective","Where we want to go. Inspiring, no number."],["kr","Key result","A measurable outcome that shows we got there."],["task","Just a task","Work we'll do (an output), not a result."]],items:[
+    ["a","Make Brightside the most reliable way for small businesses to fill their calendar","obj","An objective is a direction worth getting excited about."],
+    ["b","Raise trial activation from 41% to 47%","kr","Measurable outcome with a start and a target."],
+    ["c","Ship onboarding v2","task","Shipping is an output. The key result is what it changes (activation)."],
+    ["d","Keep weekly churn under 1%","kr","A measurable outcome to protect."],
+    ["e","Launch the Pro tier","task","An output. The key result would be Pro revenue or upgrades."],
+    ["f","Grow Pro revenue to $40k a month","kr","Measurable, with a target."],
+    ["g","Hold 5 customer interviews a week","task","A good habit, but it's activity, not an outcome."]]},
+  w3_comp:{prompt:"Compare Brightside with Slotwise, the competitor. Sort each feature.",bins:[["edge","Our edge","We do it better"],["parity","Both have it","Table stakes"],["gap","Their edge","They have it, we don't"]],items:[
+    ["a","Text reminders","parity","Both have it. Ours are now reliable again."],
+    ["b","Delivery monitoring with alerts","edge","Since the fix, we catch failures in minutes."],
+    ["c","AI booking assistant","gap","Slotwise has it. Whether we need it is a discovery question."],
+    ["d","Reports across multiple locations","gap","A gap, and big clinics keep asking. That's the Pro tier."],
+    ["e","Starter price: $29 vs their $35","edge","Cheaper for small businesses."],
+    ["f","Waitlist for fully booked days","gap","They have it; customers have asked us for it."]]},
+  w3_jobs:{prompt:"What job is each customer hiring Brightside to do? Sort the quotes.",bins:[["fill","Keep my chairs full",""],["admin","Spend less time on admin",""],["money","Stop losing money",""],["none","Feature request, not a job","A solution they suggested, not the need behind it"]],items:[
+    ["a","Rosa (salon): \"Every empty chair is money I never get back.\"","fill","The job: keep the schedule full."],
+    ["b","Marcus (barber): \"I do the schedule at 11 pm after closing. I hate it.\"","admin","The job: less admin time."],
+    ["c","Dr. Ito (dental clinic): \"No-shows cost us $2,000 a month.\"","money","The job: stop losses."],
+    ["d","Ana (spa): \"I want an AI chatbot.\"","none","A solution. Ask: what would the chatbot do for you?"],
+    ["e","Marcus: \"When someone cancels, I want that slot filled from a waitlist.\"","fill","He named a solution, but the job is clear: keep chairs full."],
+    ["f","Dr. Ito: \"My front desk spends 3 hours a day on the phone booking.\"","admin","A big admin job. This is where an AI assistant could actually help."]]},
+  w3_tree:{prompt:"Opportunity tree: put each solution under the customer problem it solves.",bins:[["fill","Empty slots after cancellations","Job: keep chairs full"],["admin","Phone booking eats front-desk time","Job: less admin (clinics)"],["none","No evidence for this","Park it"]],items:[
+    ["a","Waitlist that auto-fills cancelled slots","fill",""],["b","Last-minute text offers to regular clients","fill",""],["c","AI booking assistant that answers calls and texts","admin","Discovery says AI fits clinics with busy front desks, not salons."],["d","Booking link for Instagram and Google","admin",""],["e","Dark mode","none",""],["f","Loyalty points on the blockchain","none",""]]},
+  w3_ac:{prompt:"Acceptance criteria tell engineers exactly when the story is done. Sort them.",bins:[["good","Testable criterion","Someone could check it with a yes/no"],["bad","Too vague to test",""]],items:[
+    ["a","When a slot is cancelled and someone is on the waitlist, the first person gets a text within 1 minute.","good",""],
+    ["b","If nobody accepts within 30 minutes, the next person on the waitlist is offered the slot.","good",""],
+    ["c","The waitlist should feel fast and intuitive.","bad","How would you test \"intuitive\"? Name the behavior instead."],
+    ["d","Owners can turn the waitlist off for each service.","good",""],
+    ["e","Customers will love it.","bad","A hope, not a criterion."],
+    ["f","Make it work like Slotwise's, but better.","bad","Not specific. Better how?"]]},
+  w3_scope:{prompt:"Pro launches Friday. Only 3 things fit in Must. Sort the rest.",bins:[["must","Must have","Launch fails without it (max 3)",3],["should","Should have","Important; right after launch"],["could","Could have","Nice to have"],["wont","Won't have (now)","Out of scope for this launch"]],items:[
+    ["a","Dashboard for all locations","must","The core promise of Pro."],["b","Reports across locations","must","The thing big clinics asked for."],["c","Upgrade and billing flow","must","No billing, no revenue."],
+    ["d","Per-location staff permissions","should","Big customers will want it soon."],["e","Custom branding","could",""],["f","Priority support badge","could",""],["g","Public API access","wont","No customer asked; big effort."],["h","Single sign-on (SSO)","wont","Enterprise feature; no evidence yet."]],ok:{d:["should","could"],e:["could","wont"],f:["could","should","wont"]}},
+  w3_triage:{prompt:"Eight new bugs. Sort them before the timer runs out.",timed:60,bins:[["p0","P0 · drop everything","Core feature broken, or money/data at risk"],["p1","P1 · this sprint","Real harm, but limited or has a workaround"],["p2","P2 · backlog","Minor"],["wont","Won't fix","Not worth the time"]],items:[
+    ["a","Payments fail for 3% of Pro upgrades","p0","Money at risk on launch week."],
+    ["b","Two clients can book the same slot if they click at the same second","p0","Double bookings break trust in the core product."],
+    ["c","Booking page down for one clinic with a custom domain","p1","Serious for them, but only one account and there's a workaround link."],
+    ["d","Reminder texts delayed by 2 minutes for 10% of users","p1","Annoying, not broken. Reminders still arrive."],
+    ["e","Typo on the pricing page","p2",""],
+    ["f","CSV export is missing a column a few admins use","p2",""],
+    ["g","Calendar color slightly off in dark mode","p2",""],
+    ["h","One user wants the logo 2px bigger","wont","Polite no."]],ok:{c:["p1","p0"],g:["p2","wont"]}},
+};
+function binState(id){ const w=WX(); w.bin ||= {}; return w.bin[id] ||= {place:{},checked:false,score:0}; }
+function binOk(id,iid){ const c=BIN[id], it=c.items.find(x=>x[0]===iid), k=binState(id).place[iid]; return k===it[2] || !!(c.ok&&c.ok[iid]&&c.ok[iid].includes(k)); }
+function binHTML(id){
+  const c=BIN[id], st=binState(id), un=c.items.filter(it=>!st.place[it[0]]);
+  const card=it=>{ const ok=st.checked?binOk(id,it[0]):null; return `<div class="sticky bin-it ${UI.sel&&UI.sel.id===id+"|"+it[0]?"sel":""} ${st.checked?(ok?"ok":"no"):""}" data-drag="bin" data-id="${id}|${it[0]}">${esc(it[1])}${st.checked?`<small>${ok?"✓":"✗ → "+c.bins.find(b=>b[0]===it[2])[1]}${it[3]?" · "+esc(it[3]):""}</small>`:""}</div>`; };
+  const timer=c.timed&&!st.checked?`<div class="row" style="justify-content:space-between"><span class="small">${st.started?"Sort fast. Unsorted bugs count as wrong.":"The timer starts when you press Start."}</span><b class="num" id="bin-t-${id}">${st.started?Math.ceil(st.left)+"s":c.timed+"s"}</b></div><div class="timer"><u id="bin-tb-${id}" style="width:${st.started?st.left/c.timed*100:100}%"></u></div>`:"";
+  if(c.timed&&!st.started&&!st.checked) return `<div class="binbox stack"><p class="small">${c.prompt}</p>${timer}<div class="row"><button class="btn primary sm" data-act="bin-start" data-id="${id}">Start the timer</button></div></div>`;
+  return `<div class="binbox stack"><p class="small">${c.prompt}</p>${timer}
+    <div class="board-notes" data-drop="bin" data-zone="${id}|">${un.length?un.map(card).join(""):`<span class="small muted">All sorted.</span>`}</div>
+    <div class="clusters">${c.bins.map(([k,l,dsc,cap])=>{ const items=c.items.filter(it=>st.place[it[0]]===k); return `<div class="zone" data-drop="bin" data-zone="${id}|${k}"><h4>${l}${cap?` <span class="muted">(${items.length}/${cap})</span>`:""}</h4>${dsc?`<p class="small muted">${dsc}</p>`:""}${items.map(card).join("")}</div>`; }).join("")}</div>
+    ${st.checked?`<p class="fb ${st.score>=c.items.length-1?"ok":"no"}"><b>${st.score}/${c.items.length} right.</b></p>`:`<div class="row"><button class="btn sm" data-act="bin-check" data-id="${id}" ${un.length&&!c.timed?"disabled":""}>Check</button>${un.length&&!c.timed?`<span class="small muted">Sort every card first.</span>`:""}</div>`}</div>`;
+}
+function binCheck(id){ const st=binState(id); if(st.checked) return; st.checked=true; clearInterval(UI.binT); st.score=BIN[id].items.filter(it=>binOk(id,it[0])).length; BIN_DONE[id]?.(st.score,BIN[id].items.length); rerender(); }
+DROP.bin=(did,zone)=>{ const [cid,iid]=did.split("|"), [zid,k]=zone.split("|"); if(cid!==zid) return; const st=binState(cid); if(st.checked) return;
+  const cap=(BIN[cid].bins.find(b=>b[0]===k)||[])[3]; if(k&&cap&&BIN[cid].items.filter(it=>st.place[it[0]]===k&&it[0]!==iid).length>=cap){ toast(`That box is full (max ${cap}). Move something out first.`); UI.sel=null; rerender(); return; }
+  if(k) st.place[iid]=k; else delete st.place[iid]; UI.sel=null; rerender(); };
+const BIN_DONE={
+  w3_okr:(s,n)=>{ bump(s>=6?"trust":"velocity",s>=6?4:-2,`OKRs ${s}/${n}`); },
+  w3_comp:(s,n)=>{ goal("w3_comp"); bump(s>=5?"trust":"velocity",s>=5?3:-1,`competitor map ${s}/${n}`); },
+  w3_jobs:(s,n)=>{ bump(s>=5?"customers":"trust",s>=5?5:-1,`jobs-to-be-done ${s}/${n}`); },
+  w3_tree:(s,n)=>{ goal("w3_tree"); bump(s>=5?"velocity":"trust",s>=5?4:-2,`opportunity tree ${s}/${n}`); },
+  w3_ac:(s,n)=>{ bump(s>=5?"velocity":"trust",s>=5?4:-2,`acceptance criteria ${s}/${n}`); },
+  w3_scope:(s,n)=>{ goal("w3_scope"); bump(s>=7?"velocity":"trust",s>=7?5:-2,`scope cut ${s}/${n}`); },
+  w3_triage:(s,n)=>{ goal("w3_triage"); bump(s>=7?"customers":"velocity",s>=7?5:-3,`bug triage ${s}/${n}`); },
+};
+
+/* ---------- Click the problems on a mockup ---------- */
+const HOT=[
+  ["Choose a plan for your resource entities",1,"Jargon again. Customers say \"staff\" or \"locations\"."],
+  ["Starter · $29/month · For 1–5 staff",0,"Clear: price and who it's for."],
+  ["Pro · $49/month · Most popular",0,"Fine: a 'most popular' badge helps people choose."],
+  ["Pro includes: multi-tenant RBAC, SSO-ready API",1,"Engineer language. Say \"one dashboard for all your locations\"."],
+  ["Pro button: \"Contact sales\"",1,"A $49 self-serve plan shouldn't need a sales call. Make it \"Upgrade\"."],
+  ["Starter button: \"Start free trial\"",0,"Clear next step."],
+  ["Tiny grey link at the bottom: \"see all features\"",1,"The comparison people need is hidden and hard to read."],
+  ["FAQ: \"Can I switch plans any time? Yes.\"",0,"Answers a real worry."],
+];
+function hotHTML(){
+  const w=W3(); w.hot ||= {sel:[],checked:false,score:0}; const st=w.hot;
+  const hs=(i,cls)=>{ const on=st.sel.includes(i), h=HOT[i]; let c=on?"flag":""; if(st.checked) c=h[1]?(on?"hit":"miss"):(on?"wrong":"");
+    return `<button class="hs ${cls||""} ${c}" data-act="hot" data-i="${i}" ${st.checked?"disabled":""}>${on?"🚩 ":""}${esc(h[0])}${st.checked&&(on||h[1])?`<span class="hs-why">${h[2]}</span>`:""}</button>`; };
+  return `<div class="mock"><div class="mock-bar"><span></span><span></span><span></span><em>brightside.com/pricing</em></div>
+    <div class="mock-body">${hs(0,"mock-h")}
+      <div class="mock-plans"><div class="mock-plan">${hs(1)}${hs(5)}</div><div class="mock-plan pro">${hs(2)}${hs(3)}${hs(4)}</div></div>
+      ${hs(7)}${hs(6,"mock-tiny")}</div></div>
+    ${st.checked?`<p class="fb ${st.score>=7?"ok":"no"}"><b>${st.score}/8 judged right.</b> Priya: "Okay, fixing all four before Friday."</p>`:`<div class="row"><button class="btn sm" data-act="hot-check">Done reviewing</button></div>`}`;
+}
+
+/* ---------- Messages ---------- */
+Object.assign(MSG,{
+  w3_mon_maya:{from:"maya",text:"Week 3, and a new quarter. Goals first: kickoff at 10. Then size up the competition."},
+  w3_mon_dana:{from:"dana",text:"The board asked me: what's ONE number that tells us we're winning? Your answer?",
+    choices:[
+      {l:"Appointments booked through Brightside each week. It only grows when customers get real value.",fx:[["trust",5,"a North Star tied to customer value"]],r:"I like that. It can't be gamed by a discount.",goal:"w3_nsm"},
+      {l:"Revenue.",fx:[["trust",1,"fine, but not a North Star"]],r:"Revenue is the result. What drives it?",goal:"w3_nsm"},
+      {l:"Sign-ups.",fx:[["trust",-2,"sign-ups can grow while customers churn"]],r:"We had great sign-ups in August, while customers left.",goal:"w3_nsm"}]},
+  w3_tue_maya:{from:"maya",text:"Discovery day. You promised Dana real research on AI. Find out what job customers actually need done."},
+  w3_tue_dana:{from:"dana",text:"So. AI assistant: yes or no?",
+    choices:[
+      {l:"For clinics, maybe: their front desks spend 3 hours a day booking by phone. Not for salons. I'd test an AI assistant with 5 clinics next month.",fx:[["trust",6,"discovery-backed, segment-specific answer"]],r:"Finally, a real answer. Do it.",goal:"w3_ai"},
+      {l:"Customers don't want AI.",fx:[["trust",-3,"ignored the clinic evidence"]],r:"Dr. Ito's front desk would disagree.",goal:"w3_ai"},
+      {l:"Yes, let's build it!",fx:[["velocity",-4,"big build before testing"]],r:"…Last week you said test first.",goal:"w3_ai"}]},
+  w3_wed_maya:{from:"maya",text:"Spec day: write the waitlist story, design review with Priya at 2, then cut Pro's scope to fit Friday."},
+  w3_thu_maya:{from:"maya",text:"Heads up: Jordan has a big deal brewing. Sales deals can hijack a roadmap. Think about what's good for ALL customers."},
+  w3_thu_sam:{from:"sam",text:"The bug pile is growing 😬 Can you triage today? It's under Board → Triage."},
+  w3_fri_maya:{from:"maya",text:"Launch day! Plan it, write the release notes, launch room at 3."},
+  w3_fri_won:{from:"jordan",text:"GLOW SPA SIGNED!!! 60 locations 🎉 And they're excited about the reports feature for everyone."},
+  w3_fri_lost:{from:"jordan",text:"Glow Spa went with Slotwise. Oh well. 😞"},
+});
+
+/* ---------- Days ---------- */
+const WEEK3=[
+ {title:"Set the goals", maya:"New quarter. Before anyone builds anything, agree on where we're going and how we'll know we got there.",
+  goals:[
+   {id:"w3_kickoff",text:"Quarterly kickoff · 10:00 · Lighthouse room",where:[12,4],from:540,hint:"OKRs: an Objective is where you're going; Key Results are measurable outcomes that prove you got there. Tasks aren't key results."},
+   {id:"w3_comp",text:"Compare us with Slotwise (Docs → Research)",where:"desk",hint:"A competitive map shows where you're ahead, where you're equal, and where you're behind. Being behind isn't automatically a to-do."},
+   {id:"w3_nsm",text:"Answer Dana: what's our one number?",from:720,hint:"A North Star metric captures the value customers get. It should grow only when customers are better off."},
+   {id:"w3_leo",text:"Ask Leo how much the team can take on",optional:true,where:"leo",hint:"Before you plan anything, know your capacity."}],
+  events:[[541,()=>pushMsg("w3_mon_maya")],[590,()=>{toast("Kickoff in 10 min · Lighthouse room");walkToMeeting(["leo","priya","sam","jordan","kai"]);}],[720,()=>pushMsg("w3_mon_dana")]],
+  meetings:[{id:"kickoff",room:"meeting",at:()=>600,goal:"w3_kickoff",scene:()=>sceneKickoff(),miss:()=>{bump("trust",-6,"missed the quarterly kickoff");walkHome(["leo","priya","sam","jordan","kai"]);}}]},
+ {title:"Discovery", maya:"Dana wants to know if we should build AI. Don't guess: find out what job customers need done.",
+  goals:[
+   {id:"w3_calls",text:"Customer calls · 11:00 · call booth",where:[20,4],from:600,hint:"Jobs to be done: customers don't want a feature, they want progress in their life. Find the job behind each quote."},
+   {id:"w3_survey",text:"Fix the survey before it goes out (Docs → Research)",where:"desk",hint:"A biased survey gives you confident, wrong answers. Flag leading and hypothetical questions."},
+   {id:"w3_tree",text:"Map solutions to problems (Board → Opportunities)",where:"desk",hint:"An opportunity tree links each solution to a real customer problem. Solutions with no problem above them get parked."},
+   {id:"w3_ai",text:"Answer Dana: AI or not?",from:900,hint:"Discovery often says \"yes, for some customers\". That's a better answer than yes or no."}],
+  events:[[541,()=>pushMsg("w3_tue_maya")],[900,()=>pushMsg("w3_tue_dana")]],
+  meetings:[{id:"calls",room:"booth",at:()=>660,goal:"w3_calls",scene:()=>sceneCalls(),miss:()=>{bump("customers",-5,"skipped customer calls");}}]},
+ {title:"Spec it", maya:"Turn the waitlist idea into something engineers can build, review the Pro page, and fit the launch into the time you have.",
+  goals:[
+   {id:"w3_story",text:"Write the waitlist user story (Docs → Spec)",where:"desk",hint:"A user story says who, what and why. Acceptance criteria say exactly when it's done."},
+   {id:"w3_design",text:"Design review with Priya · 2:00 · Lighthouse room",where:[12,4],from:780,hint:"In a design review, judge it from the customer's side: is anything confusing, jargon-y, or hidden?"},
+   {id:"w3_scope",text:"Cut Pro's scope to fit Friday (Board → Scope)",where:"desk",hint:"MoSCoW: Must, Should, Could, Won't. If everything is a Must, nothing ships on time."}],
+  events:[[541,()=>pushMsg("w3_wed_maya")],[830,()=>walkToMeeting(["priya"])]],
+  meetings:[{id:"design",room:"meeting",at:()=>840,goal:"w3_design",scene:()=>sceneDesign(),miss:()=>{bump("customers",-4,"pricing page shipped with problems");walkHome(["priya"]);}}]},
+ {title:"The big deal", maya:"A big customer wants special treatment. Your job: get the deal without wrecking the roadmap for everyone else.",
+  goals:[
+   {id:"w3_jordan",text:"Jordan is coming over around 10:30",hint:"Before you say yes or no to a custom request, find out what the customer actually needs. It's often something everyone needs."},
+   {id:"w3_triage",text:"Triage new bugs (Board → Triage)",where:"desk",from:570,hint:"Triage = sorting by urgency. P0: core feature broken or money/data at risk. P1: real harm but limited. P2: minor."},
+   {id:"w3_deal",text:"Deal review · 2:00 pm · Dana's office",where:[4,4],from:780,hint:"Split the team's time so the deal doesn't starve everything else. Discounts should buy something, like a longer commitment."}],
+  events:[[541,()=>pushMsg("w3_thu_maya")],[570,()=>pushMsg("w3_thu_sam")],[630,()=>walkOver("jordan",()=>openDialog("jordan"))]],
+  meetings:[{id:"deal",room:"ceo",at:()=>840,goal:"w3_deal",scene:()=>sceneDeal(),miss:()=>{bump("trust",-8,"missed the deal review");W3().deal={won:false,missed:true};}}]},
+ {title:"Launch Pro", maya:"Launch day. A good launch is planned, explained clearly, and watched closely.",
+  goals:[
+   {id:"w3_plan",text:"Put the launch plan in order (Docs → Launch)",where:"desk",hint:"A launch has a sequence: finish, prepare the people, release to a few, tell everyone, then watch."},
+   {id:"w3_notes",text:"Write the release notes (Docs → Launch)",where:"desk",hint:"Release notes are for customers: who it's for, what it does for them, the price, and how to get it."},
+   {id:"w3_launch",text:"Launch room · 3:00 pm · Lighthouse room",where:[12,4],from:840,hint:"Watch the numbers live. When something goes wrong, contain it for the affected group instead of rolling back everything."}],
+  events:[[541,()=>pushMsg("w3_fri_maya")],[660,()=>{ const d=W3().deal; if(d&&!d.missed) pushMsg(d.won?"w3_fri_won":"w3_fri_lost"); }],[890,()=>{toast("Launch room in 10 min · Lighthouse room");walkToMeeting(["leo","kai","sam","jordan","priya"]);}]],
+  meetings:[{id:"launch",room:"meeting",at:()=>900,goal:"w3_launch",scene:()=>sceneLaunch(),miss:()=>{bump("trust",-10,"missed your own launch");}}]},
+];
+const SENIOR3=[
+  "Write objectives as direction and key results as measurable outcomes, never tasks. Pick a North Star that only grows when customers win. Treat competitor gaps as questions, not a to-do list.",
+  "Look for the job behind every request. Remove bias from surveys before sending them. Link every solution to a real problem, and answer the CEO with 'yes, for this segment, here's the test'.",
+  "Write stories as who / what / why with yes-or-no acceptance criteria. Review designs as the customer would. Protect the launch date by keeping Must small.",
+  "Find the need behind a custom request and build it for everyone if you can. Trade discounts for commitment. Triage by customer harm, and never starve reliability.",
+  "Sequence the launch, brief Support before customers notice, write release notes in customer language, and contain problems for the affected group instead of rolling everything back.",
+];
+
+/* ---------- Scenes ---------- */
+function sceneKickoff(){
+  const render=()=>{ const st=binState("w3_okr");
+    return `<span class="eyebrow">Monday 10:00 · Lighthouse room</span><h2>Quarterly kickoff: set the OKRs</h2>
+    ${sayHTML("maya","New quarter. Let's write our OKRs together. People keep putting tasks where results should go.")}
+    <div class="explain"><b>What's happening:</b> setting <b>OKRs</b>, Objectives and Key Results. The <b>Objective</b> is where you want to go: inspiring, with no number. <b>Key results</b> are 2–4 measurable outcomes that prove you got there. "Ship X" is a <b>task</b> (an output), not a result: shipping something doesn't mean it worked.</div>
+    ${binHTML("w3_okr")}
+    ${st.checked?`<div class="row"><button class="btn primary" data-act="ko-done">Back to work</button></div>`:""}`; };
+  ACT["ko-done"]=()=>{ goal("w3_kickoff"); closeScene(); walkHome(["leo","priya","sam","jordan","kai"]); };
+  openScene(render);
+}
+function sceneCalls(){
+  const render=()=>{ const st=binState("w3_jobs");
+    return `<span class="eyebrow">Tuesday 11:00 · Call booth</span><h2>Customer calls: what job are they hiring us for?</h2>
+    <div class="video"><div class="tile"><div class="av" style="background:#9C4B6E">RD</div><span>Rosa · salon</span></div><div class="tile"><div class="av" style="background:#3C6E9C">KI</div><span>Dr. Ito · dental clinic</span></div></div>
+    <div class="explain"><b>What's happening:</b> short calls with four customers. Use <b>jobs to be done</b>: people don't really want a feature, they want progress ("keep my chairs full"). When someone asks for a feature, look for the job behind it.</div>
+    ${binHTML("w3_jobs")}
+    ${st.checked?`<p class="fb ok">Notice Dr. Ito: three hours a day of phone booking. For clinics with a front desk, an AI assistant could do a real job. That's evidence Dana will want.</p><div class="row"><button class="btn primary" data-act="calls-done">Back to work</button></div>`:""}`; };
+  ACT["calls-done"]=()=>{ goal("w3_calls"); W3().clinicInsight=true; closeScene(); };
+  openScene(render);
+}
+function sceneDesign(){
+  const render=()=>`<span class="eyebrow">Wednesday 2:00 pm · Lighthouse room</span><h2>Design review: the Pro pricing page</h2>
+    ${sayHTML("priya","Here's the pricing page for Friday. Be honest. What would trip up a clinic owner?")}
+    <div class="explain"><b>What's happening:</b> a <b>design review</b>. Look at it as the customer would. Click every part that's confusing, uses jargon, adds friction, or hides something important. Leave the good parts alone.</div>
+    ${hotHTML()}
+    ${W3().hot&&W3().hot.checked?`<div class="row"><button class="btn primary" data-act="ds-done">Back to work</button></div>`:""}`;
+  ACT["ds-done"]=()=>{ goal("w3_design"); closeScene(); walkHome(["priya"]); };
+  openScene(render);
+}
+function sceneDeal(){
+  const w=W3(); w.alloc ||= {glow:6,pro:2,onb:2,rel:2}; w.dealT ||= {generalize:false,disc:null}; let done=false, res=null;
+  const A=[["glow","Glow Spa's reports (needs 6 to win the deal)"],["pro","Pro tier polish (needs 2)"],["onb","Onboarding v2 rollout (needs 3)"],["rel","Reliability: alerts and canary releases (needs 2)"]];
+  const total=()=>A.reduce((s,[k])=>s+w.alloc[k],0);
+  const out=()=>{ const t=total(), a=w.alloc; const warn=[];
+    if(a.glow<6) warn.push("Glow Spa needs 6 to be ready in time: the deal is at risk.");
+    if(a.onb<3) warn.push("Onboarding v2 slips: activation gains delayed.");
+    if(a.rel<2) warn.push("Reliability starved: another 2 a.m. outage gets likelier.");
+    if(a.pro<2) warn.push("Pro launches rough.");
+    return `<p class="num"><b>${t} / 12</b> engineer-weeks${t>12?` · <span style="color:var(--bad)">over capacity</span>`:""}</p>${warn.map(x=>`<p class="fb no small">${x}</p>`).join("")}`; };
+  const render=()=>`<span class="eyebrow">Thursday 2:00 pm · Dana's office</span><h2>Deal review: Glow Spa</h2>
+    ${sayHTML("dana","Jordan says Glow Spa is 60 locations, $35k a year. They want custom reports and 30% off. Can we do it without blowing up the roadmap?")}
+    <div class="explain"><b>What's happening:</b> a big deal is asking for custom work. The PM's job is to protect the roadmap AND help win the deal. Next month the team has <b>12 engineer-weeks</b> (12 people for one week, or 3 for four). Split them, then set the deal terms.</div>
+    <div class="stack price-ctl">${A.map(([k,l])=>`<label for="al-${k}">${l}: <b class="num" id="al-${k}-v">${w.alloc[k]}</b></label><input type="range" id="al-${k}" min="0" max="8" step="1" value="${w.alloc[k]}" data-act="alloc" data-k="${k}" ${done?"disabled":""}>`).join("")}</div>
+    <div id="al-out">${out()}</div>
+    <label class="check" for="al-gen"><input type="checkbox" id="al-gen" data-act="al-gen" ${w.dealT.generalize?"checked":""} ${done?"disabled":""}><span><b>Build it for every Pro customer</b>, not as a one-off for Glow Spa${w.jordanNeed?" (Jordan said they really need reports across locations, the same thing Pro customers want)":""}</span></label>
+    <h3>Discount</h3><div class="opts">${[["30% off, as they asked",0],["15% off in exchange for a 2-year contract",1],["No discount",2]].map(([l,i])=>`<button class="opt ${w.dealT.disc===i?"pick":""}" data-act="al-disc" data-i="${i}" ${done?"disabled":""}>${l}</button>`).join("")}</div>
+    ${!done?`<div class="row"><button class="btn primary" data-act="al-go" ${w.dealT.disc==null?"disabled":""}>Lock it in</button></div>`:
+      `${sayHTML("dana",res[0])}${res[1].map(x=>`<p class="fb ${x[0]?"ok":"no"}">${x[1]}</p>`).join("")}<div class="row"><button class="btn primary" data-act="al-done">Back to work</button></div>`}`;
+  ACT["al-gen"]=el=>{ w.dealT.generalize=el.checked; };
+  ACT["al-disc"]=el=>{ w.dealT.disc=+el.dataset.i; renderScene(); };
+  ACT["al-go"]=()=>{ const a=w.alloc, t=total(); if(t>12){ toast(`That's ${t} engineer-weeks. You only have 12.`); return; }
+    done=true; const notes=[]; const won=a.glow>=6&&w.dealT.disc!==2;
+    notes.push([won, won?"Glow Spa can be ready in time, so the deal is on.":a.glow<6?"Not enough time for Glow Spa's reports: they walk.":"No discount at all: Slotwise undercuts you and they walk."]);
+    if(w.dealT.generalize){ notes.push([true,"Built for everyone: every Pro customer gets multi-location reports. One feature, many customers."]); fx([["customers",4,"custom work generalized for all"],["velocity",3,"no one-off code to maintain"]]); }
+    else { notes.push([false,"A one-off build only Glow Spa uses: more code to maintain, no value for anyone else."]); bump("velocity",-4,"one-off custom build"); }
+    if(w.dealT.disc===0){ notes.push([false,"30% off with nothing in return trains customers to haggle."]); bump("revenue",-3,"big discount, no commitment"); }
+    if(w.dealT.disc===1){ notes.push([true,"15% for a 2-year contract: a discount that buys commitment."]); bump("revenue",5,"discount traded for a 2-year deal"); }
+    if(a.rel<2){ notes.push([false,"Reliability got less than it needs."]); bump("customers",-3,"reliability starved"); }
+    if(a.onb<3){ notes.push([false,"Onboarding v2 slips a month."]); bump("customers",-2,"activation gains delayed"); }
+    if(won) bump("revenue",6,"won a 60-location deal");
+    w.deal={won}; res=[won&&w.dealT.generalize?"A big deal AND a feature for everyone. That's the kind of trade-off I want.":won?"We won it. I hope we don't regret the custom work.":"Losing it hurts. But I'd rather lose a deal than wreck the roadmap.",notes];
+    renderScene(); };
+  ACT["al-done"]=()=>{ goal("w3_deal"); closeScene(); };
+  openScene(render);
+}
+document.addEventListener("input",e=>{ const el=e.target; if(el.dataset.act!=="alloc") return; const w=W3(); w.alloc[el.dataset.k]=+el.value; const v=document.getElementById(`al-${el.dataset.k}-v`); if(v) v.textContent=el.value;
+  const o=document.getElementById("al-out"); if(o){ const a=w.alloc, t=a.glow+a.pro+a.onb+a.rel, warn=[]; if(a.glow<6) warn.push("Glow Spa needs 6 to be ready in time: the deal is at risk."); if(a.onb<3) warn.push("Onboarding v2 slips: activation gains delayed."); if(a.rel<2) warn.push("Reliability starved: another 2 a.m. outage gets likelier."); if(a.pro<2) warn.push("Pro launches rough.");
+    o.innerHTML=`<p class="num"><b>${t} / 12</b> engineer-weeks${t>12?` · <span style="color:var(--bad)">over capacity</span>`:""}</p>${warn.map(x=>`<p class="fb no small">${x}</p>`).join("")}`; } });
+/* --- Launch room (live) --- */
+function sceneLaunch(){
+  const w=W3(); const L=w.launch ||= {t:0,upgrades:0,errors:0,tickets:0,step:0,picks:[]};
+  const hotFixed=w.hot&&w.hot.checked&&w.hot.score>=6, scoped=binState("w3_scope").checked;
+  const EV=[
+    {at:6,title:"Upgrade errors for big accounts",msg:"Upgrades are failing for accounts with more than 20 locations. Smaller accounts are fine.",who:"kai",
+     opts:[["Pause Pro for accounts with 20+ locations and fix it; keep everyone else live",1,"Contained. Small accounts keep upgrading while Kai fixes the big-account path."],["Roll back the whole launch",0,"Safe, but you just stopped 200 happy upgrades to fix a problem affecting 9 accounts."],["Ignore it; it's only a few accounts",0,"Those few accounts include Glow Spa. Jordan is not happy."]]},
+    {at:13,title:"Support is getting questions",msg:hotFixed?"A few questions about switching plans. The FAQ on the pricing page is doing its job.":"14 tickets: \"what's actually in Pro?\" People can't find the comparison.",who:"sam",
+     opts:hotFixed?[["Add the top question to the FAQ",1,"Small tweak, done."],["Write a long blog post",0,"Fine, but nobody needed it today."]]:[["Put a clear plan comparison on the pricing page now",1,"Tickets drop within the hour."],["Ask Support to explain it one by one",0,"Sam's team spends the afternoon copy-pasting."]]},
+  ];
+  const tick=()=>{ if(!UI.scene){ clearInterval(UI.launchT); return; } if(L.paused) return; L.t+=0.25;
+    const broken=L.step===0&&L.t>=EV[0].at; L.upgrades+= broken?0.6:2.2; if(broken) L.errors+=0.8; if(L.t>=EV[1].at&&L.step<=1&&!hotFixed) L.tickets+=0.7;
+    for(const [k,v] of [["lr-up",L.upgrades],["lr-err",L.errors],["lr-tk",L.tickets]]){ const el=document.getElementById(k); if(el) el.textContent=Math.floor(v); }
+    const ev=EV[L.step]; if(ev&&L.t>=ev.at&&!L.showing){ L.showing=true; L.paused=true; renderScene(); }
+    if(L.step>=EV.length&&L.t>=18&&!L.over){ L.over=true; L.paused=true; renderScene(); } };
+  clearInterval(UI.launchT); UI.launchT=setInterval(tick,250);
+  const render=()=>{ const ev=EV[L.step];
+    return `<span class="eyebrow">Friday 3:00 pm · Lighthouse room · Launch</span><h2>Brightside Pro is going live</h2>
+    <div class="explain"><b>What's happening:</b> the team turns Pro on and watches the numbers live. Your job is to make calls fast when something looks wrong.${scoped?"":" (You never cut the scope, so the team shipped tired and late.)"}</div>
+    <div class="bigm"><div><span class="eyebrow">Pro upgrades</span><b class="num" id="lr-up">${Math.floor(L.upgrades)}</b></div><div><span class="eyebrow">Upgrade errors</span><b class="num" id="lr-err" style="color:var(--bad)">${Math.floor(L.errors)}</b></div><div><span class="eyebrow">Support tickets</span><b class="num" id="lr-tk">${Math.floor(L.tickets)}</b></div></div>
+    ${L.showing&&ev?`${sayHTML(ev.who,`<b>${ev.title}.</b> ${ev.msg}`)}<div class="opts">${ev.opts.map((o,i)=>`<button class="opt ${L.picks[L.step]==null?"":o[1]?"ok":L.picks[L.step]===i?"no":""}" data-act="lr-pick" data-i="${i}" ${L.picks[L.step]!=null?"disabled":""}>${o[0]}</button>`).join("")}</div>
+      ${L.picks[L.step]!=null?`<p class="fb ${ev.opts[L.picks[L.step]][1]?"ok":"no"}">${ev.opts[L.picks[L.step]][2]}</p><div class="row"><button class="btn primary" data-act="lr-next">Keep watching</button></div>`:""}`:
+      L.over?`<p class="fb ok">End of launch day: ${Math.floor(L.upgrades)} accounts on Pro.</p><div class="row"><button class="btn primary" data-act="lr-done">Wrap up the week</button></div>`:`<p class="small muted">Watching the numbers…</p>`}`; };
+  ACT["lr-pick"]=el=>{ const ev=EV[L.step], i=+el.dataset.i; L.picks[L.step]=i; const good=ev.opts[i][1]; bump(good?(L.step?"customers":"trust"):"trust",good?4:-4,good?"good launch call":"shaky launch call"); if(L.step===0&&good) L.errors=Math.min(L.errors,6); renderScene(); };
+  ACT["lr-next"]=()=>{ L.step++; L.showing=false; L.paused=false; renderScene(); };
+  ACT["lr-done"]=()=>{ clearInterval(UI.launchT); W3().proUpgrades=Math.floor(L.upgrades); bump("revenue",L.upgrades>40?6:3,"Pro launched"); goal("w3_launch"); closeScene(); walkHome(["leo","kai","sam","jordan","priya"]); endDay(); };
+  openScene(render);
+}
+
+/* ---------- Generic NPC walk-over ---------- */
+function walkOver(id,onArrive){
+  toast(`${NPCS[id].name.split(" ")[0]} is walking over to you…`);
+  const go=()=>{ const [px,py]=tileOf(P); npcGo(id,[px+1,py],()=>{ if(Math.hypot(N[id].x-P.x,N[id].y-P.y)>70) return go(); if(UI.pc) closePC(); if(UI.dialog){UI.dialog=null;renderDialog();} onArrive(); }); };
+  go();
+}
+
+/* ---------- Talk ---------- */
+function talkW3(id){
+  const d=S.day, gl=S.goals, w=W3();
+  if(d===0&&id==="leo"&&!gl.w3_leo) return {text:"Planning the quarter?",choices:[{l:"How much can the team realistically take on next month?",go:()=>{goal("w3_leo");bump("trust",3,"asked about capacity first");return end("About 12 engineer-weeks, after on-call and bug fixing. Every 'yes' comes out of that.");}}]};
+  if(d===3&&id==="jordan"&&!gl.w3_jordan) return {text:"Big one: Glow Spa. 60 locations, $35k a year. They want custom reports built just for them, plus 30% off, signed by tomorrow or they go to Slotwise. Can I say yes?",choices:[
+    {l:"Let's find out what they actually need from those reports. What problem are they solving?",go:()=>{w.jordanNeed=true;goal("w3_jordan");bump("trust",4,"looked for the need behind the request");return end("…They want to see bookings and no-shows across all locations in one place. Honestly, half our big clinics ask for the same thing.");}},
+    {l:"Yes to everything. Close it!",go:()=>{goal("w3_jordan");bump("velocity",-4,"promised custom work blind");return end("YES. I'll tell them now.");}},
+    {l:"No custom work. Ever.",go:()=>{goal("w3_jordan");bump("trust",-3,"shut down Sales without listening");return end("Cool. I'll just lose the biggest deal of the year, then.");}}]};
+  if(d===1&&id==="dana") return end("Waiting on your AI answer.");
+  if(d===2&&id==="priya") return end(gl.w3_design?"Fixing the pricing page now.":"Design review at 2!");
+  if(d===4&&id==="sam") return end("FAQ's ready for the launch. We've got this.");
+  return null;
+}
+function hasNewsW3(id){ const d=S.day,gl=S.goals; return (d===0&&id==="leo"&&!gl.w3_leo); }
+
+/* ---------- Apps ---------- */
+function appHotW3(a){ const d=S.day,gl=S.goals; return (a==="docs"&&((d===0&&!gl.w3_comp)||(d===1&&!gl.w3_survey)||(d===2&&!gl.w3_story)||(d===4&&(!gl.w3_plan||!gl.w3_notes))))||(a==="board"&&((d===1&&!gl.w3_tree)||(d===2&&!gl.w3_scope)||(d===3&&S.min>=570&&!gl.w3_triage))); }
+function appCalendarW3(){
+  const E={"0-10":"10:00 Quarterly kickoff","1-11":"11:00 Customer calls","2-14":"2:00 Design review · Priya","3-14":"2:00 Deal review · Dana","4-15":"3:00 Launch room"};
+  const hrs=[9,10,11,12,13,14,15,16,17];
+  return `<h2>Calendar</h2><div class="cal-wrap"><div class="cal"><div class="hd" style="border-left:0"></div>${DAYNAMES.map((d,i)=>`<div class="hd" ${i===S.day?'style="background:var(--accent-soft)"':""}>${d.slice(0,3)}</div>`).join("")}
+    ${hrs.map(h=>`<div class="hr">${h>12?h-12:h}${h>=12?"pm":"am"}</div>${[0,1,2,3,4].map(d=>`<div class="cell">${E[d+"-"+h]?`<div class="ev ${d===S.day?"today":""}">${E[d+"-"+h]}</div>`:""}</div>`).join("")}`).join("")}</div></div>`;
+}
+const SERIES3={booked:{label:"Appointments booked through Brightside per week (thousands)",unit:"k",v:[38.2,38.9,40.1,41.0,42.4],max:50},act:{label:"Trial activation",unit:"%",v:[41,41,43,45,46],max:60}};
+function appAnalyticsW3(){ const lb=["Oct 6","Oct 13","Oct 20","Oct 27","Nov 3"];
+  return `<h2>Analytics · North Star</h2><p class="small muted">The <b>North Star metric</b> is the one number that best captures value delivered to customers. For Brightside: appointments booked through us.</p>
+    <div class="dash2">${["booked","act"].map(k=>`<div class="an-chart"><b>${SERIES3[k].label}</b>${lineChart(SERIES3[k],lb,3)}</div>`).join("")}</div>`; }
+const STORY_FB={parts:["As a ",{o:["salon owner with a fully booked day","Brightside engineer","Slotwise customer"],a:0},", I want ",{o:["a freed-up slot offered to my waitlist automatically","a new database table","more buttons"],a:0},", so that ",{o:["my empty chairs get filled without me phoning around","the code is cleaner","we beat Slotwise"],a:0},"."],why:"Who (a real user), what (what they can do), why (the job it gets done). Not about our code or competitors."};
+FB.w3_story=STORY_FB; FB_DONE.w3_story=(s,n)=>{ bump(s===n?"velocity":"trust",s===n?3:-2,`user story ${s}/${n}`); };
+SPOT.w3_survey={prompt:"Flag every question that's leading, hypothetical, or assumes the answer.",items:[
+  ["How much do you love our AI booking assistant idea?",1,"Assumes they love it, and pitches the idea."],
+  ["In the last month, how many appointments did you book by phone?",0,"Good: a fact about recent behavior."],
+  ["Would you pay $20 more a month for AI?",1,"Hypothetical: people are bad at predicting what they'd pay."],
+  ["What's the most time-consuming part of managing your bookings?",0,"Good: open, about their real work."],
+  ["Don't you agree waitlists are useful?",1,"Leading: pushes toward yes."],
+  ["On a typical week, how many slots end up empty?",0,"Good: concrete and recent."]]};
+ORD.w3_launch={items:["Freeze scope and finish testing","Brief Support and Sales, with an FAQ","Turn Pro on for 10% of eligible accounts","Publish the pricing page and release notes","Email every customer with 6+ staff","Watch upgrades, errors and tickets for 48 hours"],start:[3,5,0,4,2,1],why:"Build → prepare the people → small release → public launch → tell customers → watch. Support hears first, customers hear once it works."};
+ORD_DONE.w3_launch=(s,n)=>{ goal("w3_plan"); bump(s>=n-1?"velocity":"trust",s>=n-1?4:-2,`launch plan ${s}/${n}`); };
+WC.w3_notes={title:"Release notes: Brightside Pro",who:"salon and clinic owners with 6+ staff",prompt:"What's new, who it's for, what it costs, and how to get it. Customer language only.",ph:"Introducing Brightside Pro…",
+  model:"Introducing Brightside Pro\nFor salons and clinics with 6 or more staff, or more than one location.\n• One dashboard for all your locations\n• Reports across every location: bookings, no-shows, busiest staff\n• Upgrade in two clicks, cancel any time\n$49 a month. Starter stays at $29.\nTurn it on today in Settings → Plan. Questions? Just reply to this email.",
+  rubric:[["Says who it's for",/6|staff|location|clinic|salon|team/i],["Lists the benefits",/dashboard|report|location/i],["States the price",/\$|49|price|month/i],["Says how to get it",/settings|upgrade|turn on|today|click|plan/i],["Customer language, no jargon (RBAC, SSO, API, tenant)",/rbac|\bsso\b|\bapi\b|tenant/i,true]]};
+WC_DONE.w3_notes=(s,n)=>{ goal("w3_notes"); bump("customers",s>=4?5:s>=3?2:-2,`release notes ${s}/${n}`); };
+function appDocsW3(){
+  const tab=UI.docTab||"research";
+  const tabs=`<div class="row">${[["research","Research"],["spec","Spec"],["launch","Launch"]].map(([k,l])=>`<button class="ib ${tab===k?"on":""}" data-act="doc-tab" data-t="${k}">${l}</button>`).join("")}</div>`;
+  if(tab==="research") return tabs+`<h2>Research</h2>
+    <div class="card-w stack"><h3>Competitive map: Brightside vs Slotwise</h3><p class="small muted">A <b>competitive analysis</b> shows where you're ahead, level, or behind. Being behind isn't automatically a to-do: it's a question for discovery.</p>${binHTML("w3_comp")}</div>
+    ${S.day>=1?`<div class="card-w stack"><h3>Survey draft: going to 2,000 customers</h3><p class="small muted">One bad question can make a whole survey useless. Fix it before it goes out.</p>${spotHTML("w3_survey")}</div>`:""}`;
+  if(tab==="spec"){ if(S.day<2) return tabs+`<h2>Spec</h2><p class="muted">Spec day is Wednesday.</p>`;
+    return tabs+`<div class="spec stack"><h2>Spec: Waitlist</h2><div class="explain">A <b>user story</b> describes a feature from the user's side: <i>As a [who], I want [what], so that [why].</i> <b>Acceptance criteria</b> are the yes/no checks that define "done".</div>
+      <h3>1. The story</h3>${fbHTML("w3_story")}<h3>2. Acceptance criteria</h3>${binHTML("w3_ac")}
+      ${fbState("w3_story").checked&&binState("w3_ac").checked&&!S.goals.w3_story?`<div class="row"><button class="btn primary" data-act="story-done">Hand the spec to Leo</button></div>`:""}${S.goals.w3_story?`<p class="fb ok">Leo: "Clear enough to estimate. About 5 points."</p>`:""}</div>`; }
+  if(S.day<4) return tabs+`<h2>Launch</h2><p class="muted">Launch prep happens Friday.</p>`;
+  return tabs+`<h2>Launch</h2><div class="card-w stack"><h3>Launch plan: put the steps in order</h3>${ordHTML("w3_launch")}</div><div class="card-w">${wcHTML("w3_notes")}</div>`;
+}
+function appBoardW3(){
+  const tab=UI.boardTab||"opps";
+  const tabs=`<div class="row">${[["opps","Opportunities"],["scope","Scope"],["triage","Triage"]].map(([k,l])=>`<button class="ib ${tab===k?"on":""}" data-act="board-tab" data-t="${k}">${l}</button>`).join("")}</div>`;
+  if(tab==="opps"){ if(S.day<1) return tabs+`<h2>Opportunities</h2><p class="muted">Do the customer calls first (Tuesday).</p>`;
+    return tabs+`<h2>Opportunity tree</h2><div class="explain">An <b>opportunity solution tree</b> starts from the outcome (more appointments booked), branches into customer <b>problems</b> (opportunities), then into <b>solutions</b>. If a solution has no problem above it, it's a guess.</div>${binHTML("w3_tree")}`; }
+  if(tab==="scope"){ if(S.day<2) return tabs+`<h2>Scope</h2><p class="muted">Scoping happens Wednesday.</p>`;
+    return tabs+`<h2>Pro launch scope</h2><div class="explain"><b>MoSCoW</b>: Must, Should, Could, Won't. Musts are the things the launch fails without. Keep that list short, or nothing ships on time.</div>${binHTML("w3_scope")}`; }
+  if(S.day<3) return tabs+`<h2>Triage</h2><p class="muted">No new bugs yet.</p>`;
+  return tabs+`<h2>Bug triage</h2><div class="explain"><b>Triage</b> means sorting by urgency, fast. <b>P0</b>: the core product is broken, or money or data is at risk: drop everything. <b>P1</b>: real harm but limited, fix this sprint. <b>P2</b>: minor, backlog. Some requests deserve a polite "won't fix".</div>${binHTML("w3_triage")}`;
+}
+function weekReport3(){
+  const w=W3(), avg=Math.round(METERS.reduce((a,m)=>a+S.meters[m[0]],0)/4);
+  const rows=[["OKRs",binState("w3_okr").checked?`${binState("w3_okr").score}/7 sorted right`:"—"],["Discovery",binState("w3_jobs").checked?`${binState("w3_jobs").score}/6 jobs found`:"—"],["Glow Spa deal",w.deal?(w.deal.won?"won":"lost"):"—"],["Pro launch",w.proUpgrades!=null?`${w.proUpgrades} upgrades on day one`:"—"]];
+  return `<div class="stack"><span class="eyebrow">Week 3 recap</span><div class="daygoals">${rows.map(r=>`<div><b>${r[0]}:</b> ${r[1]}</div>`).join("")}</div>
+    <div class="bigm">${METERS.map(m=>`<div><span class="eyebrow">${m[1]}</span><b class="num">${S.meters[m[0]]}</b></div>`).join("")}</div>
+    <p><b>${avg>=72?"Outstanding. You ran a quarter's worth of PM work in a week.":avg>=58?"Solid week. Check the daily notes for where to sharpen up.":"Tough week. Replay it and try Maya's approach."}</b></p>
+    <p class="small muted">Skills this week: OKRs · North Star metrics · competitive analysis · jobs to be done · survey design · opportunity trees · user stories · acceptance criteria · design review · MoSCoW · bug triage · deal trade-offs · launch planning · release notes.</p></div>`;
+}
+Object.assign(ACT,{
+  "bin-check":el=>binCheck(el.dataset.id),
+  "bin-start":el=>{ const id=el.dataset.id, st=binState(id); st.started=true; st.left=BIN[id].timed; clearInterval(UI.binT);
+    UI.binT=setInterval(()=>{ if(st.checked||!document.getElementById(`bin-t-${id}`)){ if(st.checked) clearInterval(UI.binT); if(!document.getElementById(`bin-t-${id}`)&&!st.checked){ st.left=Math.max(0,st.left-0.25); if(st.left<=0) binCheck(id); } return; }
+      st.left=Math.max(0,st.left-0.25); document.getElementById(`bin-t-${id}`).textContent=Math.ceil(st.left)+"s"; const b=document.getElementById(`bin-tb-${id}`); if(b) b.style.width=(st.left/BIN[id].timed*100)+"%";
+      if(st.left<=0){ toast("Time's up!"); binCheck(id); } },250); rerender(); },
+  hot:el=>{ const st=W3().hot, i=+el.dataset.i, k=st.sel.indexOf(i); k>=0?st.sel.splice(k,1):st.sel.push(i); renderScene(); },
+  "hot-check":()=>{ const st=W3().hot; st.checked=true; st.score=HOT.filter((h,i)=>!!h[1]===st.sel.includes(i)).length; bump(st.score>=7?"customers":"trust",st.score>=7?5:-2,`design review ${st.score}/8`); renderScene(); },
+  "story-done":()=>{ goal("w3_story"); renderApp(); },
+});
+const _spotCheck=ACT["spot-check"];
+ACT["spot-check"]=el=>{ _spotCheck(el); if(el.dataset.id==="w3_survey") goal("w3_survey"); };
+
+/* ================= Weeks registry + home page ================= */
+const WEEKS=[WEEK1,WEEK2,WEEK3];
+const WEEKMETA=[
+  {title:"The churn crisis",desc:"Customers are cancelling twice as fast as before. Find out why and fix it.",skills:["Stakeholders","Customer interviews","Data & segments","RICE","Sprint planning","PRDs"],meters:{trust:50,customers:50,velocity:50,revenue:50},ai:true},
+  {title:"Growth and fire",desc:"Measure the launch, run an A/B test, survive a 2 a.m. outage, set prices, plan the quarter.",skills:["Retros","A/B tests","Incidents","Postmortems","Pricing","Roadmaps"],meters:{trust:60,customers:60,velocity:55,revenue:55}},
+  {title:"Strategy and launch",desc:"Set OKRs, run discovery, spec a feature, handle a big sales deal, and launch a new plan.",skills:["OKRs","Jobs to be done","User stories","Design review","Bug triage","Launches"],meters:{trust:62,customers:62,velocity:60,revenue:60}},
+];
+const WK=[null,
+  {apps:[["calendar","Calendar"],["analytics","Analytics"],["docs","Docs"],["experiments","Experiments"],["board","Board"]],appHot:a=>appHotW2(a),talk:id=>talkW2(id),hasNews:id=>hasNewsW2(id),
+   calendar:()=>appCalendarW2(),analytics:()=>appAnalyticsW2(),docs:()=>appDocsW2(),board:()=>appRoadmap(),
+   docTab:()=>S.day===2&&!S.goals.w2_pm?"pm":"writing",boardTab:()=>"roadmap",
+   tipKey:()=>({analytics:"measure",docs:UI.docTab==="pm"?"postmortem":"wc",experiments:"experiments",board:"roadmap"})[UI.app],
+   must:["w2_allhands","Not yet! All-hands is at 4pm and you're presenting."],senior:SENIOR2,report:()=>weekReport2()},
+  {apps:[["calendar","Calendar"],["analytics","Analytics"],["docs","Docs"],["board","Board"]],appHot:a=>appHotW3(a),talk:id=>talkW3(id),hasNews:id=>hasNewsW3(id),
+   calendar:()=>appCalendarW3(),analytics:()=>appAnalyticsW3(),docs:()=>appDocsW3(),board:()=>appBoardW3(),
+   docTab:()=>S.day===2?"spec":S.day===4?"launch":"research",boardTab:()=>S.day===3?"triage":S.day===2?"scope":"opps",
+   tipKey:()=>({docs:UI.docTab==="launch"?"wc":"bins",board:"bins"})[UI.app],
+   must:["w3_launch","Not yet! The launch room is at 3pm."],senior:SENIOR3,report:()=>weekReport3()},
+];
+TIPS.bins=[[".binbox .board-notes","Drag each card into a box, or tap a card and then tap a box. Press Check to see the right answers and why."]];
+
+const slotKey=w=>KEY+"-w"+w, cpKey=w=>KEY+"-cp-w"+w;
+let DONE=loadKey(KEY+"-done")||{};
+(function migrate(){ const old=loadKey(KEY+"-auto"); if(old&&old.week!=null&&!loadKey(slotKey(old.week))){ try{ localStorage.setItem(slotKey(old.week),JSON.stringify(old)); }catch{} }
+  const oc=loadKey(KEY+"-cp"); if(oc&&oc.week!=null&&!loadKey(cpKey(oc.week))){ try{ localStorage.setItem(cpKey(oc.week),JSON.stringify(oc)); }catch{} }
+  try{ localStorage.removeItem(KEY+"-auto"); localStorage.removeItem(KEY+"-cp"); }catch{} })();
+function markWeekDone(){ const avg=Math.round(METERS.reduce((a,m)=>a+S.meters[m[0]],0)/4); DONE[S.week]={avg,at:Date.now()}; try{ localStorage.setItem(KEY+"-done",JSON.stringify(DONE)); }catch{} }
+
+function renderHome(){
+  const root=document.getElementById("scene-root");
+  const cards=WEEKMETA.map((m,i)=>{
+    const slot=loadKey(slotKey(i)), cp=loadKey(cpKey(i)), done=DONE[i];
+    const inProg=slot&&slot.stage==="play"&&!(slot.dayEnded&&slot.day===4);
+    const status=done&&!inProg?`<span class="pill p2">Completed · score ${done.avg}</span>`:inProg?`<span class="pill p1">In progress · ${DAYNAMES[slot.day].slice(0,3)} ${slot.dayEnded?"(day done)":fmt(slot.min)}</span>`:`<span class="pill" style="background:var(--sunk)">Not started</span>`;
+    return `<div class="wk"><div class="row" style="justify-content:space-between"><span class="eyebrow">Week ${i+1}</span>${status}</div>
+      <h2>${m.title}</h2><p class="small">${m.desc}</p>
+      <div class="chips">${m.skills.map(s=>`<span>${s}</span>`).join("")}</div>
+      ${m.ai?`<p class="small muted">Optional AI conversations on claude.ai</p>`:`<p class="small muted">No AI needed</p>`}
+      <div class="row">${inProg?`<button class="btn primary sm" data-act="wk-continue" data-w="${i}">Continue</button>`:""}
+        <button class="btn ${inProg?"ghost":"primary"} sm" data-act="wk-start" data-w="${i}">${inProg?"Start over":done?"Play again":"Start"}</button>
+        ${inProg&&cp&&cp.day>0?`<button class="btn ghost sm" data-act="wk-day" data-w="${i}">Restart ${DAYNAMES[cp.day]}</button>`:""}</div></div>`; }).join("");
+  root.innerHTML=`<div class="scrim"><div class="sheet home" role="dialog" aria-label="Home">
+    <div class="stack"><span class="eyebrow">Brightside PM Sim</span>
+      <h1>Learn product management by doing the job.</h1>
+      <p class="lede">You're the new Product Manager at Brightside, a scheduling app for small salons and clinics. Each week is a new challenge. Play them in order, or jump to any week.</p></div>
+    <div class="weeks">${cards}</div>
+    <div class="row" style="justify-content:space-between;align-items:flex-start">
+      <details class="howto"><summary><b>How to play</b></summary><div class="keys" style="margin-top:8px">
+        <div><kbd>←↑↓→</kbd> / <kbd>WASD</kbd> or click the floor: walk</div><div>Click a person, or press <kbd>E</kbd> when near: talk</div>
+        <div>Walk to your desk and press <kbd>E</kbd>: open your laptop</div><div>Meetings start on time. Walk into the room to join.</div>
+        <div><kbd>P</kbd> pauses. ⏩ skips to the next event. <b>Home</b> (top bar) saves and comes back here.</div></div></details>
+      <div class="stack" style="gap:8px">
+        <label class="check" for="noai"><input type="checkbox" id="noai" data-act="noai" ${NOAI?"checked":""}><span><b>Play without AI.</b> Every conversation uses written reply choices.</span></label>
+        <div class="row"><button class="btn ghost sm" data-act="load-file">Load save file</button><input type="file" id="load-input" accept=".json,application/json" hidden><span class="small muted">Progress autosaves in this browser.</span></div>
+      </div></div>
+  </div></div>`;
+}
+function goHome(){
+  saveNow(); clearInterval(UI.incT); clearInterval(UI.binT); clearInterval(UI.launchT);
+  UI.pc=null; UI.dialog=null; UI.scene=null; UI.coach=null; UI.summary=null; UI.sel=null;
+  S=fresh(); DAYS=WEEK1; render();
+}
+Object.assign(ACT,{
+  home:()=>goHome(),
+  "wk-continue":el=>{ const s=loadKey(slotKey(+el.dataset.w)); if(s) resumeSave(s); },
+  "wk-start":el=>{ const w=+el.dataset.w, slot=loadKey(slotKey(w)), live=slot&&slot.stage==="play"&&!(slot.dayEnded&&slot.day===4);
+    if(live&&!el.dataset.confirm){ el.dataset.confirm="1"; el.textContent="Click again to erase this week's progress"; return; }
+    startWeek(w,false); },
+  "wk-day":el=>{ const cp=loadKey(cpKey(+el.dataset.w)); if(cp){ S=cp; DAYS=WEEKS[S.week]; startDay(); } },
+  "next-week":()=>startWeek(S.week+1,true),
+});
 
 /* ================= Saving ================= */
 let downloadsNS=null;
 (async()=>{ try{ if(window.claude&&window.claude.use) downloadsNS=await window.claude.use("downloads"); }catch{} })();
 function resumeSave(saved){
-  S=saved; DAYS=S.week===1?WEEK2:WEEK1; S.stage="play"; lastMin=-1;
+  S=saved; DAYS=WEEKS[S.week||0]; S.stage="play"; lastMin=-1;
   UI.pc=null; UI.dialog=null; UI.scene=null; UI.coach=null; UI.summary=null; UI.sel=null;
   npcsHome(); if(S.pos){ P.x=S.pos[0]; P.y=S.pos[1]; } P.path=[]; P.pending=null;
   // a meeting that was in progress when you left restarts when you're back in the room
@@ -2016,7 +2469,7 @@ function resumeSave(saved){
   render(); renderClock();
   if(S.dayEnded){ UI.summary={kind:S.day===4?"week":"end"}; renderSummary(); return; }
   const dd=DAYS[S.day];
-  if(dd.onStart&&!S.goals.w2_incident){ dd.onStart(); return; }
+  if(dd.onStart&&!S.goals[dd.startGoal]){ dd.onStart(); return; }
   if(S.week===0&&S.day===3&&S.fired["3:e1"]&&!S.goals.thu_dana) setTimeout(danaWalksOver,600);
   S.paused=true; renderHUD(); toast("Welcome back! The game is paused. Press Resume when you're ready.");
 }
@@ -2050,7 +2503,7 @@ Object.assign(ACT,{
 });
 document.addEventListener("change",e=>{ if(e.target.id==="load-input"&&e.target.files&&e.target.files[0]) importSave(e.target.files[0]); });
 
-function render(){ renderHUD(); renderSide(); renderPC(); renderDialog(); renderCoach(); if(S.stage==="intro"){ document.getElementById("scene-root").innerHTML=""; renderIntro(); } }
+function render(){ renderHUD(); renderSide(); renderPC(); renderDialog(); renderCoach(); if(S.stage==="intro"){ document.getElementById("scene-root").innerHTML=""; renderHome(); } }
 render();
 requestAnimationFrame(frame);
 </script>

@@ -4,6 +4,9 @@ A browser game that teaches product management by doing it. You're the new Produ
 
 - **Week 1:** customers are cancelling twice as fast as before. Find out why and fix it.
 - **Week 2:** measure the launch, run an A/B test, survive a 2 a.m. outage, set prices, and plan the quarter.
+- **Week 3:** set OKRs, run discovery, spec a feature, handle a big sales deal, and launch a new plan.
+
+Start from the home page and jump to any week.
 
 No experience needed. Every tool explains itself the first time you use it.
 
