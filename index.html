@@ -386,20 +386,6 @@ let toastT;
 function toast(m){ const r=document.getElementById("toast-root"); r.innerHTML=`<div class="toast" role="status">${esc(m)}</div>`; clearTimeout(toastT); toastT=setTimeout(()=>r.innerHTML="",2800); }
 function goal(id,st="done"){ if(S.goals[id]) return; S.goals[id]=st; renderSide(); if(st==="done") toast("Goal complete ✓"); }
 
-/* ================= Claude ================= */
-let sample=null, aiState="checking";
-(async()=>{ try{ if(window.claude&&window.claude.use) sample=await window.claude.use("sample"); }catch{} aiState=sample?"on":"off"; renderHUD(); if(S.stage==="intro") renderHome(); })();
-let NOAI=false; try{ NOAI=!!localStorage.getItem(KEY+"-noai"); }catch{}
-const aiOn=()=>aiState==="on"&&!NOAI;
-setTimeout(()=>{ if(aiState==="checking"){aiState="off";renderHUD();if(S.stage==="intro")renderHome();} },11000);
-function aiFail(e){
-  const c=e&&e.code;
-  if(["not_granted","sampling_disabled","not_declared","capability_disabled","capability_removed"].includes(c)){ aiState="off"; sample=null; renderHUD(); return "AI characters are off for this page, so we switched to scripted replies."; }
-  if(c==="rate_limited") return "Claude is busy or you've hit a usage limit. Wait a minute and try again.";
-  if(c==="session_expired") return "Your Claude session expired. Sign in again, then retry.";
-  return "Couldn't reach Claude just now. Try again.";
-}
-
 /* ================= Messages (phone) ================= */
 const MSG={
   mon_dana:{from:"dana",text:"Welcome to Brightside! Bad timing though: churn has more than doubled since summer and the board meets in 3 weeks. I need a plan by Friday. Slotwise just launched an AI booking assistant… maybe that's our answer?",
@@ -747,7 +733,7 @@ function renderHUD(){
       <button class="ib" data-act="skip" title="Jump to the next scheduled event">⏩ Next event</button>
     </div>
     <div class="meters" id="meters">${METERS.map(([k,l,h])=>`<div class="meter" title="${esc(h)}">${l}<b>${S.meters[k]}</b><i><u style="width:${S.meters[k]}%"></u></i></div>`).join("")}</div>
-    <div class="row"><span class="ib" style="border:0;background:var(--sunk)">Week ${S.week+1} · ${aiOn()?"AI cast on":aiState==="checking"&&!NOAI?"…":"Scripted"}</span>
+    <div class="row"><span class="ib" style="border:0;background:var(--sunk)">Week ${S.week+1}</span>
     <button class="ib" data-act="glossary">Glossary</button>${S.stage==="play"?`<button class="ib" data-act="home" title="Save and go to the home page">Home</button><button class="ib" data-act="export" title="Download your progress as a file">Save file</button><span class="small muted" id="saved"></span>`:""}</div>`;
 }
 function renderClock(){ const el=document.getElementById("clock-t"); if(el) el.textContent=`${DAYNAMES[S.day].slice(0,3)} ${fmt(S.min)}${S.paused?" · paused":""}`; }
@@ -857,26 +843,6 @@ function sceneStandup(){
 }
 
 /* --- Customer interview --- */
-const ROSA_RULES=`You are role-playing "Rosa Delgado" in a product-management training game. The Product Manager from Brightside is interviewing you on a video call. Stay in character; never mention being an AI or a game.
-
-Who you are: Rosa, 44, owns "Rosa's Studio", a hair salon with 4 chairs and 3 stylists. You used Brightside (appointment scheduling software) for about 2 years and cancelled last month (September), switching to a competitor called Slotwise.
-
-What really happened (reveal details only when the question invites them):
-- Brightside worked well for almost 2 years. The calendar was fine, never the problem.
-- From around mid-August, your clients said they never got their reminder text messages.
-- No-shows went from about 2 a week to about 6 a week. Each costs about $70, so roughly $400 a week lost.
-- You started texting every client yourself the night before, from your own phone. About an hour every evening.
-- You contacted Brightside support twice and got copy-paste replies. Nothing changed.
-- Slotwise is a bit more expensive, but "their reminders just work". Price was not why you left.
-- You don't care about AI features. You'd consider coming back if reminders were reliable.
-
-How to answer:
-- Busy, friendly small-business owner. 1-3 short sentences. Plain words.
-- Open questions about your experience get real, specific stories.
-- Leading or yes/no questions get short, vague, polite agreement even when not quite true ("Was it the price?" -> "I mean, everything's expensive these days, so… sure, maybe.").
-- Hypothetical future questions ("would you use X?") get cheerful, meaningless answers.
-- If the PM pitches or defends the product, get a bit short.
-- If asked to say more, give one more concrete detail.`;
 const ROSA_OPEN="Hi! I've got about fifteen minutes before my next client. What did you want to ask?";
 const QCARDS=[
   {q:"Can you walk me through the last few months of using Brightside?",type:"open",a:"It was great for almost two years. Then around August my clients started saying they never got their reminder text. People just… stopped showing up.",c:"reminders"},
@@ -890,73 +856,38 @@ const QCARDS=[
 ];
 const QTIP={open:"Open question: got a real story.",leading:"Leading: suggested the answer, so she agreed politely.",hypothetical:"Hypothetical: answers about the future are weak evidence.",closed:"Yes/no: a fact, but no story."};
 function clusterOf(text){ const s=text.toLowerCase(); if(/remind|text|no-?show|show up|missing appointments/.test(s)) return "reminders"; if(/price|expensive|cost|cheap/.test(s)) return "price"; if(/support|called|copy-paste/.test(s)) return "support"; if(/calendar|feature|ai|design/.test(s)) return "product"; return "other"; }
-let rosaBusy=false, rosaCtl=null, rosaErr="";
 function sceneInterview(){
-  const mode=()=>S.flags.rosaMode||(aiOn()?"ai":"scripted");
   const T=S.interview; const max=6;
-  const render=()=>{ const n=T.filter(x=>x.me).length, ai=mode()==="ai";
-    const cards=`<div class="cards">${QCARDS.map((c,i)=>`<button class="qcard" data-act="${ai?"rq-fill":"rq-card"}" data-i="${i}" ${(!ai&&T.some(x=>x.card===i))||n>=max||rosaBusy?"disabled":""}>${c.q}</button>`).join("")}</div>`;
+  const render=()=>{ const n=T.filter(x=>x.me).length;
+    const cards=`<div class="cards">${QCARDS.map((c,i)=>`<button class="qcard" data-act="rq-card" data-i="${i}" ${T.some(x=>x.card===i)||n>=max?"disabled":""}>${c.q}</button>`).join("")}</div>`;
     return `<span class="eyebrow">${DAYNAMES[S.day]} ${fmt(S.min)} · Call booth</span><h2>Customer interview: Rosa Delgado</h2>
     <div class="video"><div class="tile"><div class="av" style="background:#9C4B6E">RD</div><span>Rosa · Rosa's Studio</span></div><div class="tile"><div class="av" style="background:#F0A43A;color:#2A1B05">You</div><span>You${S.flags.priyaInvited?" + Priya":""}</span></div></div>
-    <div class="explain"><b>How to interview:</b> ask ${t("open","open questions")} about what actually happened ("walk me through…", "what happened when…"). Avoid ${t("leading","leading questions")} and "would you…" questions. Click <b>📌 Pin</b> on anything important she says. Those become your notes. Questions used: <b>${n}/${max}</b>.</div>
+    <div class="explain"><b>How to interview:</b> ask ${t("open","open questions")} about what actually happened ("walk me through…", "what happened when…"). Avoid ${t("leading","leading questions")} and "would you…" questions. After each answer you'll see what kind of question you asked. Click <b>📌 Pin</b> on anything important she says: pinned quotes become your notes. Questions used: <b>${n}/${max}</b>.</div>
     <div class="chat">
       <div class="line"><div class="t"><b>Rosa:</b> ${ROSA_OPEN}</div></div>
-      ${T.map((x,i)=>x.me?`<div class="line me"><div class="t">${esc(x.text)}${x.type?`<span class="qtag">${x.type}</span>`:""}</div></div>`:
+      ${T.map((x,i)=>x.me?`<div class="line me"><div class="t">${esc(x.text)}${x.type?`<span class="qtag">${x.type} · ${QTIP[x.type]}</span>`:""}</div></div>`:
         `<div class="line"><div class="t"><b>Rosa:</b> ${esc(x.text)}</div><button class="pinq ${x.pinned?"on":""}" data-act="rq-pin" data-i="${i}">${x.pinned?"📌 Pinned":"📌 Pin"}</button></div>`).join("")}
-      ${rosaBusy?`<div class="line"><div class="t" style="font-style:italic;opacity:.7">Rosa is thinking…</div></div>`:""}
     </div>
-    ${rosaErr?`<p class="fb no">${esc(rosaErr)}</p>`:""}
-    ${n<max?(ai?`<label for="rosa-q" class="small muted">Type your question</label><textarea id="rosa-q" placeholder="Can you walk me through…" ${rosaBusy?"disabled":""}></textarea>
-      <div class="row"><button class="btn" data-act="rq-send" ${rosaBusy?"disabled":""}>Ask</button>${rosaBusy?`<button class="btn ghost" data-act="rq-stop">Stop</button>`:""}</div>
-      <details><summary class="small muted">Need ideas? Example questions (click to edit)</summary>${cards}</details>`:`<p class="small muted">Choose your next question:</p>${cards}`):`<p class="muted">Rosa has to get back to her client.</p>`}
-    <div class="row"><button class="btn primary" data-act="rq-end" ${n<3||rosaBusy?"disabled":""}>End call</button>${n<3?`<span class="small muted">Ask at least 3 questions first.</span>`:""}</div>`; };
-  ACT["rq-card"]=el=>{ const c=QCARDS[+el.dataset.i]; S.flags.rosaMode="scripted"; T.push({me:true,text:c.q,type:c.type,card:+el.dataset.i}); T.push({me:false,text:c.a,c:c.c}); renderScene(); };
-  ACT["rq-fill"]=el=>{ const ta=document.getElementById("rosa-q"); ta.value=QCARDS[+el.dataset.i].q; ta.focus(); };
-  ACT["rq-send"]=()=>{ const v=document.getElementById("rosa-q").value.trim(); if(v&&!rosaBusy){ S.flags.rosaMode="ai"; askRosa(v); } };
-  ACT["rq-stop"]=()=>rosaCtl?.abort();
+    ${n<max?`<p class="small muted">Choose your next question:</p>${cards}`:`<p class="muted">Rosa has to get back to her client.</p>`}
+    <div class="row"><button class="btn primary" data-act="rq-end" ${n<3?"disabled":""}>End call</button>${n<3?`<span class="small muted">Ask at least 3 questions first.</span>`:""}</div>`; };
+  ACT["rq-card"]=el=>{ const c=QCARDS[+el.dataset.i]; T.push({me:true,text:c.q,type:c.type,card:+el.dataset.i}); T.push({me:false,text:c.a,c:c.c}); renderScene(); };
   ACT["rq-pin"]=el=>{ const x=T[+el.dataset.i]; x.pinned=!x.pinned; renderScene(); };
   ACT["rq-end"]=()=>{
     const pinned=T.filter(x=>!x.me&&x.pinned);
     pinned.forEach((x,i)=>S.notes.push({id:"r"+i,text:`Rosa: "${x.text}"`,src:"Interview",c:x.c||clusterOf(x.text)}));
-    const qs=T.filter(x=>x.me); const open=qs.filter(x=>(x.type||guessType(x.text))==="open").length, bad=qs.length-open;
+    const qs=T.filter(x=>x.me); const open=qs.filter(x=>x.type==="open").length, bad=qs.length-open;
     goal("tue_interview");
     if(open) bump("customers",Math.min(8,open*2),`${open} open question${open>1?"s":""}`);
     if(bad) bump("trust",-Math.min(6,bad*2),`${bad} leading/closed question${bad>1?"s":""}`);
     if(!pinned.length) toast("You didn't pin anything, so your notes are thin.");
-    S.flags.qReview=qs.map(x=>{const ty=x.type||guessType(x.text);return [x.text,ty];});
     closeScene();
     UI.dialog={id:"maya",node:end(`Nice. You asked ${qs.length} questions: <b>${open} open</b>${bad?`, ${bad} leading/closed`:""}. ${bad?"Notice how leading questions just got polite agreement. ":""}Your pinned quotes are now sticky notes on the Research board (Docs, on your laptop).`)}; renderDialog();
   };
   openScene(render);
 }
-function guessType(q){ const s=q.trim().toLowerCase(); if(/^(would|will|if you|imagine)/.test(s)) return "hypothetical"; if(/(don't you|wasn't it|isn't it|was it|was the|is it because|did you leave because|too (high|expensive))/.test(s)) return "leading"; if(/^(how|what|why|walk|tell|describe|can you (tell|walk|describe))/.test(s)) return "open"; if(/^(do|did|is|are|was|were|have|has|can|could)\b/.test(s)) return "closed"; return "open"; }
-async function askRosa(q){
-  const T=S.interview; T.push({me:true,text:q,type:guessType(q)}); rosaBusy=true; rosaErr=""; renderScene();
-  const turns=[{role:"user",content:ROSA_RULES+`\n\nYour opening line (already said): "${ROSA_OPEN}"\n\nThe PM asks:`}];
-  T.forEach(x=>turns.push({role:x.me?"user":"assistant",content:x.text}));
-  rosaCtl=new AbortController();
-  try{ const {text}=await sample(turns,{modelTier:"quick",cache:false,signal:rosaCtl.signal}); T.push({me:false,text:text.trim(),c:clusterOf(text)}); }
-  catch(e){ T.pop(); if(e.code!=="cancelled") rosaErr=aiFail(e); if(aiState!=="on") S.flags.rosaMode="scripted"; }
-  rosaBusy=false; renderScene();
-}
 
 /* --- Dana walks over (Thu) --- */
 const DANA_OPEN="Got a minute? Slotwise launched AI booking and it's all my board asks about. Why shouldn't we build that first?";
-const DANA_RULES=`You are role-playing "Dana Okafor", CEO of Brightside (appointment scheduling software for small salons and clinics), in a product-management training game. You've walked over to your Product Manager's desk for a quick chat. Stay in character; never mention being an AI or a game.
-
-What you know: monthly churn doubled from ~3% to ~7% since August. Competitor Slotwise launched an AI booking assistant and the board keeps asking about AI. Board meets in 3 weeks.
-
-Personality: sharp, busy, impatient, fair. You respect evidence and respectful pushback.
-
-Stance: you want the AI assistant built first. Change your mind ONLY if the PM gives concrete evidence (numbers like the reminder delivery drop from 98% to 79%, churn among reminder users, exit surveys, or customer quotes) that broken reminders drive churn AND explains why fixing it first is smart. Warm up more if they offer a path for AI later or something to tell the board. If they simply agree to AI first, accept happily. If vague or rude, push harder.
-
-2-4 plain-spoken sentences per reply. The PM gets 3 messages. When you reply to their 3rd message (or earlier if clearly persuaded, or they agreed to AI first), end with a final line that is exactly one of:
-DECISION: FIX_FIRST
-DECISION: AI_FIRST
-DECISION: BOTH
-Never write a DECISION line otherwise.
-
-Your opening (already said): "${DANA_OPEN}"`;
 const DANA_SCRIPT=[
   [["You're right. Let's build the AI assistant first.","caved","Love it. Timeline by Monday.","AI_FIRST"],
    ["Reminder delivery fell from 98% to 79% in August, and customers who use reminders churn almost 3× more. Fixing it is about 8 points, one sprint.","evidence","Hm. Those are real numbers. But the board wants to see innovation, not bug fixes. What do I tell them?"],
@@ -965,7 +896,6 @@ const DANA_SCRIPT=[
    ["The board doesn't really get our product.","rude","Careful. Fine, do both at once and let's see.","BOTH"],
    ["Let's just do both at the same time.","both","Fine. Both. Make it work.","BOTH"]],
 ];
-let danaBusy=false, danaCtl=null, danaErr="";
 function danaWalksOver(){
   if(UI.pc) { UI.pc.locked=false; }
   toast("Dana is walking over to you…");
@@ -974,49 +904,25 @@ function danaWalksOver(){
 }
 function sceneDana(){
   const C=S.danaChat; let round=0;
-  const mode=()=>S.flags.danaMode||(aiOn()?"ai":"scripted");
-  const render=()=>{ const mine=C.filter(x=>x.me).length, ended=!!S.flags.danaDecision, ai=mode()==="ai";
+  const render=()=>{ const ended=!!S.flags.danaDecision;
     return `<span class="eyebrow">${DAYNAMES[S.day]} ${fmt(S.min)} · At your desk</span><h2>The CEO stops by</h2>
-    <div class="explain"><b>What's happening:</b> the CEO wants a different priority. Disagreeing with leadership is normal for a PM. Do it with ${t("evidence")}, acknowledge their pressure (the board, competitors), and offer a path forward. ${ai?`Type your replies. You get 3.`:""}</div>
+    <div class="explain"><b>What's happening:</b> the CEO wants a different priority. Disagreeing with leadership is normal for a PM. Do it with ${t("evidence")}, acknowledge their pressure (the board, competitors), and offer a path forward. Pick your reply.</div>
     <div class="chat"><div class="line"><div class="t"><b>Dana:</b> ${DANA_OPEN}</div></div>
-      ${C.map(x=>`<div class="line ${x.me?"me":""}"><div class="t">${x.me?"":"<b>Dana:</b> "}${esc(x.text)}</div></div>`).join("")}
-      ${danaBusy?`<div class="line"><div class="t" style="font-style:italic;opacity:.7">Dana is thinking…</div></div>`:""}</div>
-    ${danaErr?`<p class="fb no">${esc(danaErr)}</p>`:""}
-    ${!ended?(ai?`<textarea id="dana-msg" placeholder="Dana, here's what the data shows…" ${danaBusy?"disabled":""}></textarea><div class="row"><button class="btn" data-act="dn-send" ${danaBusy?"disabled":""}>Reply (${3-mine} left)</button></div>`
-      :`<div class="opts">${DANA_SCRIPT[round].map((o,i)=>`<button class="opt" data-act="dn-pick" data-i="${i}">${o[0]}</button>`).join("")}</div>`):""}
+      ${C.map(x=>`<div class="line ${x.me?"me":""}"><div class="t">${x.me?"":"<b>Dana:</b> "}${esc(x.text)}</div></div>`).join("")}</div>
+    ${!ended?`<div class="opts">${DANA_SCRIPT[round].map((o,i)=>`<button class="opt" data-act="dn-pick" data-i="${i}">${o[0]}</button>`).join("")}</div>`:""}
     ${ended?`<p class="fb ${S.flags.danaDecision==="FIX_FIRST"?"ok":"no"}"><b>Outcome:</b> ${{FIX_FIRST:"Dana backs fixing reminders first.",AI_FIRST:"Dana expects the AI assistant in this sprint.",BOTH:"Dana wants both at once. That won't fit in one sprint."}[S.flags.danaDecision]}</p>${S.flags.danaFeedback?`<p class="fb">${esc(S.flags.danaFeedback)}</p>`:""}
-      <div class="row"><button class="btn primary" data-act="dn-done" ${danaBusy?"disabled":""}>Back to work</button></div>`:""}`; };
-  ACT["dn-pick"]=el=>{ const o=DANA_SCRIPT[round][+el.dataset.i]; S.flags.danaMode="scripted"; (S.flags.danaPicks ||= []).push(o[1]); C.push({me:true,text:o[0]}); C.push({me:false,text:o[2]}); if(o[3]) return finishDana(o[3]); round++; renderScene(); };
-  ACT["dn-send"]=()=>{ const v=document.getElementById("dana-msg").value.trim(); if(v&&!danaBusy){ S.flags.danaMode="ai"; sendDana(v); } };
+      <div class="row"><button class="btn primary" data-act="dn-done">Back to work</button></div>`:""}`; };
+  ACT["dn-pick"]=el=>{ const o=DANA_SCRIPT[round][+el.dataset.i]; (S.flags.danaPicks ||= []).push(o[1]); C.push({me:true,text:o[0]}); C.push({me:false,text:o[2]}); if(o[3]) return finishDana(o[3]); round++; renderScene(); };
   ACT["dn-done"]=()=>{ goal("thu_dana"); closeScene(); npcGo("dana",NPCS.dana.home); };
   openScene(render);
 }
-async function sendDana(msg){
-  const C=S.danaChat; C.push({me:true,text:msg}); danaBusy=true; danaErr=""; renderScene();
-  const turns=[{role:"user",content:DANA_RULES+"\n\nThe PM replies:"}]; C.forEach(x=>turns.push({role:x.me?"user":"assistant",content:x.raw||x.text}));
-  const mine=C.filter(x=>x.me).length; if(mine>=3) turns[turns.length-1].content+="\n\n(This is the PM's 3rd and final message. End with the DECISION line.)";
-  danaCtl=new AbortController();
-  try{ const {text}=await sample(turns,{modelTier:"default",cache:false,signal:danaCtl.signal});
-    const m=text.match(/DECISION:\s*(FIX_FIRST|AI_FIRST|BOTH)/); C.push({me:false,text:text.replace(/\n?\s*DECISION:.*$/s,"").trim(),raw:text.trim()});
-    danaBusy=false; if(m||mine>=3) return finishDana(m?m[1]:"BOTH");
-  }catch(e){ C.pop(); if(e.code!=="cancelled") danaErr=aiFail(e); if(aiState!=="on") S.flags.danaMode="scripted"; }
-  danaBusy=false; renderScene();
-}
-async function finishDana(dec){
+function finishDana(dec){
   S.flags.danaDecision=dec;
   if(dec==="FIX_FIRST"){ bump("trust",8,"Dana backed your plan"); }
   else if(dec==="AI_FIRST"){ bump("customers",-6,"real problem deprioritized"); }
   else { bump("velocity",-4,"two big priorities at once"); }
-  if((S.flags.danaMode==="ai")&&sample){
-    danaBusy=true; renderScene();
-    try{ const tr=`Dana: ${DANA_OPEN}\n`+S.danaChat.map(x=>(x.me?"PM: ":"Dana: ")+x.text).join("\n");
-      const ev=await sample.json(`You coach beginner product managers. Here's a PM pushing back on their CEO, who wanted an AI feature instead of fixing broken reminder texts that drive churn. In 2-3 plain, encouraging sentences: what they did well, and one thing to do better (evidence? acknowledged the CEO's concern? offered a path? respectful?). Reply with only JSON: {"feedback":"..."}\n\n${tr}`,{modelTier:"quick"});
-      S.flags.danaFeedback=String(ev.feedback||""); }catch(e){}
-    danaBusy=false;
-  } else {
-    const p=S.flags.danaPicks||[];
-    S.flags.danaFeedback = p.includes("evidence")&&p.includes("path")?"Textbook: numbers first, then a story Dana can tell the board.":p.includes("caved")?"Agreeing felt safe, but you had evidence pointing elsewhere. Respectful disagreement is part of the job.":"Right instinct, incomplete case. Lead with numbers, then give Dana a plan for the board.";
-  }
+  const p=S.flags.danaPicks||[];
+  S.flags.danaFeedback = p.includes("evidence")&&p.includes("path")?"Textbook: numbers first, then a story Dana can tell the board.":p.includes("caved")?"Agreeing felt safe, but you had evidence pointing elsewhere. Respectful disagreement is part of the job.":"Right instinct, incomplete case. Lead with numbers, then give Dana a plan for the board.";
   renderScene();
 }
 
@@ -1199,16 +1105,28 @@ function appDocs(){
   }
   // PRD
   if(S.day<4) return tabs+`<h2>PRD</h2><p class="muted">You'll write the PRD on Friday, once you've decided what to build.</p>`;
-  const r=S.prdReview;
+  const r=S.prdReview&&S.prdReview.ticks?S.prdReview:null;
   return tabs+`<div class="prd stack"><h2>PRD · Reliable appointment reminders</h2>
-    ${PRD_FIELDS.map(f=>`<div class="field"><label for="prd-${f[0]}">${f[1]} ${r?`<span class="pill p${r.scores[f[0]]??0}">${r.scores[f[0]]??0}/2</span>`:""}</label><span class="hint">${f[2]}</span>
-      <textarea id="prd-${f[0]}" data-act="prd" data-k="${f[0]}" ${r?"disabled":""}>${esc(S.prd[f[0]]||"")}</textarea>
-      ${f[0]==="evidence"&&!r&&S.pins.length?`<div class="row">${S.pins.map((p,i)=>`<button class="ib" data-act="prd-ins" data-i="${i}">+ ${esc(p.label)}</button>`).join("")}</div>`:""}
-      ${r&&r.comments&&r.comments[f[0]]?`<p class="fb">${esc(r.comments[f[0]])}</p>`:""}</div>`).join("")}
-    ${!r?`<div class="row"><button class="btn primary" data-act="prd-review" ${UI.prdBusy?"disabled":""}>${UI.prdBusy?"Maya is reading…":"Send to Maya for review"}</button></div>`:`<p class="fb ok">${esc(r.overall)}</p>`}
+    ${!r?`<p class="small muted">Write each section yourself first. Then compare with Maya's version, section by section, and tick the ones where yours does the job.</p>`:`<p class="small muted">Yours on the left, Maya's on the right. We pre-ticked what looks covered, so fix anything we got wrong.</p>`}
+    ${PRD_FIELDS.map((f,i)=>`<div class="field"><label for="prd-${f[0]}">${f[1]}</label><span class="hint">${f[2]}</span>
+      ${!r?`<textarea id="prd-${f[0]}" data-act="prd" data-k="${f[0]}">${esc(S.prd[f[0]]||"")}</textarea>
+      ${f[0]==="evidence"&&S.pins.length?`<div class="row">${S.pins.map((p,j)=>`<button class="ib" data-act="prd-ins" data-i="${j}">+ ${esc(p.label)}</button>`).join("")}</div>`:""}`:
+      `<div class="cmp"><div class="doc">${esc(S.prd[f[0]]||"")||"<i>(empty)</i>"}</div><div class="doc model">${MODEL_PRD[f[0]]}</div></div>
+      <label class="check" for="prdt-${i}"><input type="checkbox" id="prdt-${i}" data-act="prd-tick" data-k="${f[0]}" ${r.ticks[f[0]]?"checked":""} ${r.done?"disabled":""}><span>Mine does this: ${f[3]}</span></label>`}</div>`).join("")}
+    ${!r?`<div class="row"><button class="btn primary" data-act="prd-review">Compare with Maya's version</button></div>`:
+      r.done?`<p class="fb ${r.score>=5?"ok":"no"}"><b>${r.score}/6 sections up to standard.</b> ${r.score>=5?"This is a PRD I'd send to the CEO.":r.score>=3?"Good bones. Compare the unticked sections with mine.":"A start. Notice how specific each of my sections is."}</p>`:
+      `<div class="row"><button class="btn" data-act="prd-done">Submit self-check</button></div>`}
   </div>`;
 }
-const PRD_FIELDS=[["problem","Problem","What's going wrong, for whom, how big. Don't name a solution."],["users","Who's affected","Which customers, specifically?"],["evidence","Evidence","Numbers and quotes that prove it."],["metric","Success metric","The number that shows it worked, with a target and a deadline."],["inscope","In scope","What we will do."],["outscope","Out of scope","What we're deliberately NOT doing."]];
+const MODEL_PRD={
+  problem:"Since August 4, about 1 in 5 appointment reminder texts never arrives. No-shows have gone up, and monthly churn has more than doubled (3% → 7%).",
+  users:"Small businesses (1–5 staff) that rely on SMS reminders: about 1,800 accounts. Every no-show is lost revenue for them.",
+  evidence:"Reminder delivery fell from 98.5% to 79% after the Aug 4 provider switch. Churn for reminder users is 8.4% vs 3.0% for non-users. Reminder tickets went from 12 to 142 a month. Rosa (salon owner): \"Their reminders just work.\"",
+  metric:"Reminder delivery at 98% or higher for 4 weeks straight, starting within 2 weeks. Churn among reminder users back under 4% by December.",
+  inscope:"Move to a reliable SMS provider; add delivery-rate monitoring and alerts; email affected accounts with an explanation and a month's credit.",
+  outscope:"AI booking assistant (research it next month); calendar rebuild; pricing changes.",
+};
+const PRD_FIELDS=[["problem","Problem","What's going wrong, for whom, how big. Don't name a solution.","states the problem without naming a fix"],["users","Who's affected","Which customers, specifically?","names a specific group of customers"],["evidence","Evidence","Numbers and quotes that prove it.","uses real numbers or quotes"],["metric","Success metric","The number that shows it worked, with a target and a deadline.","has a number, a target and a deadline"],["inscope","In scope","What we will do.","lists what we'll actually do"],["outscope","Out of scope","What we're deliberately NOT doing.","says what we're not doing"]];
 function heuristicPRD(p){
   const s={},c={},has=(k,re)=>re.test(p[k]||""),len=k=>(p[k]||"").trim().length;
   s.problem=len("problem")<20?0:has("problem",/\b(build|add|switch|implement)\b/i)?1:has("problem",/remind|no-?show|churn/i)?2:1; if(s.problem<2)c.problem="Describe what's wrong (reminders failing, churn up) without naming the fix.";
@@ -1219,27 +1137,9 @@ function heuristicPRD(p){
   const total=s.problem+s.users+s.evidence+s.metric+Math.round((s.inscope+s.outscope)/2);
   return {scores:s,comments:c,total,overall:total>=9?"This is a PRD I'd send to the CEO.":total>=6?"Good bones. Tighten the sections I flagged.":"A start. Notice where you need specifics and numbers."};
 }
-async function reviewPRD(){
-  let rv=null;
-  if(sample&&aiOn()){
-    UI.prdBusy=true; renderApp();
-    try{ const doc=PRD_FIELDS.map(f=>`## ${f[1]}\n${S.prd[f[0]]||"(empty)"}`).join("\n\n");
-      rv=await sample.json(`You are Maya, a kind but rigorous Head of Product, reviewing a one-page PRD by a beginner PM at Brightside (scheduling software for small salons/clinics). Facts they found this week: SMS provider switched Aug 4; reminder delivery fell 98.5% -> 79%; monthly churn 3% -> 7%; small businesses (1-5 staff) churn 9.8%; reminder users churn 8.4% vs 3.0%; reminder tickets 12 -> 142/month; ~1,800 accounts use reminders.
-
-Score each section 0-2 (0 missing/wrong, 1 partial, 2 strong): problem (states the problem without naming a solution), users (specific segment), evidence (concrete numbers/quotes), metric (measurable, target, deadline), inscope, outscope. One-sentence plain-language comment for any section under 2. Then a 2-3 sentence overall note in a warm voice.
-
-Reply with only JSON: {"scores":{"problem":2,"users":2,"evidence":2,"metric":2,"inscope":2,"outscope":2},"comments":{"problem":""},"overall":"..."}
-
-PRD:
-${doc}`,{modelTier:"default"});
-      if(!rv||!rv.scores) throw {code:"invalid_json"}; rv.comments ||= {};
-      const sc=rv.scores; rv.total=(+sc.problem||0)+(+sc.users||0)+(+sc.evidence||0)+(+sc.metric||0)+Math.round(((+sc.inscope||0)+(+sc.outscope||0))/2);
-    }catch(e){ rv=null; if(e.code!=="invalid_json") toast(aiFail(e)); }
-    UI.prdBusy=false;
-  }
-  if(!rv) rv=heuristicPRD(S.prd);
-  S.prdReview=rv; goal("fri_prd"); bump("trust",(rv.total-5)*2||1,`PRD scored ${rv.total}/10`);
-  renderApp();
+function reviewPRD(){
+  const h=heuristicPRD(S.prd), ticks={}; PRD_FIELDS.forEach(f=>ticks[f[0]]=(h.scores[f[0]]||0)>=2);
+  S.prdReview={ticks,done:false,score:0}; renderApp();
 }
 
 /* --- Board (matrix + sprint) --- */
@@ -1369,34 +1269,6 @@ function weekReport(){
 }
 
 /* ================= Intro ================= */
-function renderIntro(){
-  const root=document.getElementById("scene-root");
-  if(S.stage!=="intro") return;
-  const cp=CHECKPOINT&&CHECKPOINT.day!=null; const auto=AUTO&&AUTO.stage==="play"&&AUTO.day!=null;
-  root.innerHTML=`<div class="scrim"><div class="sheet" role="dialog" style="width:min(860px,100%)">
-    <div class="intro-grid"><div class="stack">
-      <span class="eyebrow">Brightside, Inc. · Week 1</span>
-      <h1>You're the new Product Manager. Your first day starts Monday at 9.</h1>
-      <p>Brightside makes scheduling software for small salons and clinics. Customers have started cancelling twice as fast as before, and the CEO wants a plan by Friday.</p>
-      <p>You'll walk the office, talk to your team, sit at your laptop and use real PM tools, and make calls that change what happens next. No experience needed: every tool explains itself the first time you use it, and your manager Maya is always one click away.</p>
-      ${auto?`<div class="explain row" style="justify-content:space-between"><span><b>Saved game found:</b> Week ${(AUTO.week||0)+1}, ${DAYNAMES[AUTO.day]} ${AUTO.dayEnded?"(end of day)":fmt(AUTO.min)}</span><span class="row"><button class="btn primary sm" data-act="resume-auto">Continue</button>${cp?`<button class="btn ghost sm" data-act="continue">Restart ${DAYNAMES[CHECKPOINT.day]} from 9 am</button>`:""}</span></div>`:""}
-      <div class="row"><button class="btn ${auto?"ghost":"primary"}" data-act="begin">Start Week 1</button><button class="btn ghost" data-act="begin-w2">Jump to Week 2</button><button class="btn ghost" data-act="load-file">Load save file</button><input type="file" id="load-input" accept=".json,application/json" hidden></div>
-      <p class="small muted">Week 1: find out why customers are leaving. Week 2: measure, experiment, survive an outage, set prices, plan the quarter.</p>
-    </div>
-    <div class="stack">
-      <div class="explain stack"><b>How to play</b>
-        <div class="keys">
-          <div><kbd>←↑↓→</kbd> / <kbd>WASD</kbd> or click the floor: walk</div>
-          <div>Click a person, or press <kbd>E</kbd> when near: talk</div>
-          <div>Walk to your desk and press <kbd>E</kbd>: open your laptop</div>
-          <div>Meetings start on time. Walk into the room to join.</div>
-          <div><kbd>P</kbd> pauses. ⏩ skips to the next event.</div>
-        </div></div>
-      <label class="check" for="noai"><input type="checkbox" id="noai" data-act="noai" ${NOAI?"checked":""}><span><b>Play without AI.</b> Every conversation uses written reply choices. Week 2 never needs AI.</span></label>
-      <p class="small muted">${aiOn()?"The customer and the CEO are played by Claude, so you can type to them in your own words. Claude will ask you to allow this the first time.":aiState==="checking"?"Checking for AI characters…":"Every conversation uses written reply choices, so there's nothing to set up."}</p>
-    </div></div></div></div>`;
-}
-
 /* ================= Glossary drawer ================= */
 function openGlossary(focus){
   const root=document.getElementById("drawer-root");
@@ -1483,6 +1355,8 @@ const ACT={
   expand:()=>{ S.flags.expanded=true; bump("trust",3,"staged rollout done right"); renderApp(); },
   "prd-ins":el=>{ const p=S.pins[+el.dataset.i]; const ta=document.getElementById("prd-evidence"); ta.value=(ta.value?ta.value.trim()+"\n":"")+"• "+p.label+(p.id.startsWith("delivery")?": fell from 98.5% to 79% in Aug":p.id.startsWith("tickets")?": 12 → 142 per month":p.id.includes("rem")?": 8.4% vs 3.0%":p.id.includes("size")?": 1–5 staff churn at 9.8%":p.id.startsWith("churn")?": 3.2% → 7.1% since Aug":""); S.prd.evidence=ta.value; },
   "prd-review":()=>reviewPRD(),
+  "prd-tick":el=>{ if(S.prdReview) S.prdReview.ticks[el.dataset.k]=el.checked; },
+  "prd-done":()=>{ const r=S.prdReview; r.done=true; r.score=Object.values(r.ticks).filter(Boolean).length; goal("fri_prd"); bump("trust",(r.score-3)*2||1,`PRD ${r.score}/6 sections`); renderApp(); },
 };
 document.addEventListener("click",e=>{
   if(e.target.closest("[data-drag]")) return;
@@ -2003,7 +1877,6 @@ Object.assign(ACT,{
   "road-check":()=>{ const w=W2(); const good=ROAD.filter(r=>r.ok.includes(w.road[r.id])).length; goal("w2_roadmap"); bump(good>=6?"velocity":"trust",good>=6?6:-2,`roadmap ${good}/8 agreed`); renderApp(); },
   "start-w2":()=>{ startWeek(1,true); },
   "begin-w2":()=>{ startWeek(1,false); },
-  "noai":el=>{ NOAI=el.checked; try{localStorage.setItem(KEY+"-noai",NOAI?"1":"");}catch{} renderHUD(); renderHome(); },
 });
 DROP.retro=(id,z)=>{ const w=W2(); w.retro ||= {}; if(z) w.retro[id]=z; else delete w.retro[id]; UI.sel=null; rerender(); };
 DROP.road=(id,z)=>{ const w=W2(); w.road ||= {}; if(S.goals.w2_roadmap) return; const cap=(RCOLS.find(c=>c[0]===z)||[])[2]; if(z&&cap&&ROAD.filter(r=>w.road[r.id]===z&&r.id!==id).length>=cap){ toast(`${RCOLS.find(c=>c[0]===z)[1]} is full (max ${cap}). Move something out first.`); UI.sel=null; rerender(); return; } if(z) w.road[id]=z; else delete w.road[id]; UI.sel=null; rerender(); };
@@ -2387,7 +2260,7 @@ ACT["spot-check"]=el=>{ _spotCheck(el); if(el.dataset.id==="w3_survey") goal("w3
 /* ================= Weeks registry + home page ================= */
 const WEEKS=[WEEK1,WEEK2,WEEK3];
 const WEEKMETA=[
-  {title:"The churn crisis",desc:"Customers are cancelling twice as fast as before. Find out why and fix it.",skills:["Stakeholders","Customer interviews","Data & segments","RICE","Sprint planning","PRDs"],meters:{trust:50,customers:50,velocity:50,revenue:50},ai:true},
+  {title:"The churn crisis",desc:"Customers are cancelling twice as fast as before. Find out why and fix it.",skills:["Stakeholders","Customer interviews","Data & segments","RICE","Sprint planning","PRDs"],meters:{trust:50,customers:50,velocity:50,revenue:50}},
   {title:"Growth and fire",desc:"Measure the launch, run an A/B test, survive a 2 a.m. outage, set prices, plan the quarter.",skills:["Retros","A/B tests","Incidents","Postmortems","Pricing","Roadmaps"],meters:{trust:60,customers:60,velocity:55,revenue:55}},
   {title:"Strategy and launch",desc:"Set OKRs, run discovery, spec a feature, handle a big sales deal, and launch a new plan.",skills:["OKRs","Jobs to be done","User stories","Design review","Bug triage","Launches"],meters:{trust:62,customers:62,velocity:60,revenue:60}},
 ];
@@ -2421,7 +2294,6 @@ function renderHome(){
     return `<div class="wk"><div class="row" style="justify-content:space-between"><span class="eyebrow">Week ${i+1}</span>${status}</div>
       <h2>${m.title}</h2><p class="small">${m.desc}</p>
       <div class="chips">${m.skills.map(s=>`<span>${s}</span>`).join("")}</div>
-      ${m.ai?`<p class="small muted">Optional AI conversations on claude.ai</p>`:`<p class="small muted">No AI needed</p>`}
       <div class="row">${inProg?`<button class="btn primary sm" data-act="wk-continue" data-w="${i}">Continue</button>`:""}
         <button class="btn ${inProg?"ghost":"primary"} sm" data-act="wk-start" data-w="${i}">${inProg?"Start over":done?"Play again":"Start"}</button>
         ${inProg&&cp&&cp.day>0?`<button class="btn ghost sm" data-act="wk-day" data-w="${i}">Restart ${DAYNAMES[cp.day]}</button>`:""}</div></div>`; }).join("");
@@ -2436,7 +2308,6 @@ function renderHome(){
         <div>Walk to your desk and press <kbd>E</kbd>: open your laptop</div><div>Meetings start on time. Walk into the room to join.</div>
         <div><kbd>P</kbd> pauses. ⏩ skips to the next event. <b>Home</b> (top bar) saves and comes back here.</div></div></details>
       <div class="stack" style="gap:8px">
-        <label class="check" for="noai"><input type="checkbox" id="noai" data-act="noai" ${NOAI?"checked":""}><span><b>Play without AI.</b> Every conversation uses written reply choices.</span></label>
         <div class="row"><button class="btn ghost sm" data-act="load-file">Load save file</button><input type="file" id="load-input" accept=".json,application/json" hidden><span class="small muted">Progress autosaves in this browser.</span></div>
       </div></div>
   </div></div>`;
