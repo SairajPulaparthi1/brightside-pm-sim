@@ -2,28 +2,25 @@
 <title>Brightside PM Sim</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=IBM+Plex+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&family=Space+Mono:wght@400;700&family=Doto:wght@400..900&display=swap">
 <style>
 /* Layout: HUD strip (day, live clock, meters) over a two-pane stage — the walkable office canvas left, goals + phone right; laptop/dialog/scene overlays sit on top. */
 :root{
-  --bg:#E8ECF2; --surface:#FFFFFF; --sunk:#E1E6EE; --ink:#152238; --muted:#566379; --line:#CFD7E3;
-  --accent:#F0A43A; --accent-ink:#2A1B05; --accent-soft:#FCEBD0;
-  --link:#2D5BD8; --good:#1E8556; --good-soft:#DDF2E7; --bad:#C2412D; --bad-soft:#F8E1DC; --warn:#A86A00;
-  --scrim:rgba(14,21,34,.55);
-  --display:"Bricolage Grotesque","Avenir Next",system-ui,sans-serif;
-  --body:"Atkinson Hyperlegible","Segoe UI",system-ui,sans-serif;
-  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  /* Night-desk palette, measured from Hamza's Desk (raomuhammadhamza.tech) */
+  --bg:#0B0E17; --surface:#12121B; --sunk:#1A1A26; --ink:#F4E7E2; --muted:#B9B2C4; --line:#2B2B3C;
+  --accent:#FF9EBB; --accent-ink:#1B1F33; --accent-soft:rgba(255,158,187,.12);
+  --link:#8FD3C1; --good:#39FF88; --good-soft:rgba(57,255,136,.1); --bad:#FF7A85; --bad-soft:rgba(255,122,133,.12); --warn:#F2C285;
+  --scrim:rgba(5,6,12,.72);
+  --display:"Space Grotesk","Avenir Next",system-ui,sans-serif;
+  --body:"Space Grotesk","Segoe UI",system-ui,sans-serif;
+  --mono:"Space Mono",ui-monospace,Menlo,monospace;
+  --dot:"Doto","Space Mono",ui-monospace,monospace;
+  --glass:linear-gradient(180deg,rgba(22,26,48,.86),rgba(12,14,28,.9));
+  --scan:repeating-linear-gradient(0deg,rgba(255,255,255,.035) 0 1px,transparent 1px 3px);
+  --glass-edge:rgba(255,158,187,.2);
+  --glass-glow:inset 0 0 0 1px rgba(255,255,255,.03),inset 0 0 22px rgba(255,158,187,.07),0 12px 40px rgba(0,0,0,.45);
+  color-scheme:dark;
 }
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#0E1522; --surface:#162032; --sunk:#1D2A40; --ink:#E6EBF3; --muted:#9BA7BB; --line:#2A3852;
-  --accent:#F4B04F; --accent-ink:#241603; --accent-soft:#3A2C17;
-  --link:#8CAEFF; --good:#4CC28A; --good-soft:#173527; --bad:#F07A66; --bad-soft:#3E1F1A; --warn:#E3A93C;
-  --scrim:rgba(0,0,0,.6); color-scheme:dark}}
-:root[data-theme="dark"]{
-  --bg:#0E1522; --surface:#162032; --sunk:#1D2A40; --ink:#E6EBF3; --muted:#9BA7BB; --line:#2A3852;
-  --accent:#F4B04F; --accent-ink:#241603; --accent-soft:#3A2C17;
-  --link:#8CAEFF; --good:#4CC28A; --good-soft:#173527; --bad:#F07A66; --bad-soft:#3E1F1A; --warn:#E3A93C;
-  --scrim:rgba(0,0,0,.6); color-scheme:dark}
 *{box-sizing:border-box}
 html,body{height:100%}
 body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--body);margin:0}
@@ -246,6 +243,87 @@ table.res{border-collapse:collapse;font-size:.9rem} table.res td,table.res th{pa
 .hs.mock-tiny{font-size:.68rem;color:#9aa3b2;background:transparent}
 .hs.flag{border-color:#C2412D;background:#FBE9E6}.hs.hit{border:2px solid #1E8556;background:#DDF2E7}.hs.miss{border:2px dashed #C2412D}.hs.wrong{border:2px solid #C2412D;background:#FBE9E6}
 .hs-why{display:block;font-size:.75rem;color:#4a5568;margin-top:3px}
+/* ===== Night-desk skin (style reference: Hamza's Desk). Delete this block + restore the tokens above to roll back. ===== */
+body{background:radial-gradient(1100px 700px at 15% -10%,rgba(90,70,140,.22),transparent 60%),radial-gradient(900px 600px at 100% 110%,rgba(242,194,133,.08),transparent 60%),var(--bg);background-attachment:fixed;font-size:15px;-webkit-font-smoothing:antialiased}
+::selection{background:rgba(255,158,187,.3)}
+h1{font-weight:700;letter-spacing:-.025em} h2,h3{font-weight:600}
+.eyebrow{font:400 .72rem/1 var(--mono);letter-spacing:.08em;color:var(--accent)}
+:focus-visible{outline-color:var(--accent)}
+/* glass "TV" surfaces */
+.panel,.sheet,.dialog,.coach,.drawer,.pc{background:var(--scan),var(--glass);border:1px solid var(--glass-edge);box-shadow:var(--glass-glow);backdrop-filter:blur(14px) saturate(1.3);-webkit-backdrop-filter:blur(14px) saturate(1.3)}
+.panel,.sheet,.dialog,.coach,.pc{border-radius:12px}
+.drawer{border-width:0 0 0 1px}
+.pc-top{background:rgba(255,255,255,.02);border-bottom-color:var(--line);font:400 .78rem var(--mono);letter-spacing:.06em;text-transform:uppercase}
+.pc-top b{font:700 1rem var(--dot);letter-spacing:.06em;color:var(--accent);text-transform:uppercase}
+/* buttons: pink primary, glass secondary, mono uppercase labels like the site's nav */
+.btn{border-radius:8px;font:400 .78rem/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;padding:11px 16px;background:rgba(255,255,255,.04);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line)}
+.btn:hover:not(:disabled){box-shadow:inset 0 0 0 1px var(--glass-edge),0 0 14px rgba(255,158,187,.12)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);box-shadow:0 0 12px rgba(255,158,187,.35)}
+.btn.primary:hover:not(:disabled){box-shadow:0 0 18px rgba(255,158,187,.55)}
+.btn.ghost{background:transparent;border:0;box-shadow:inset 0 0 0 1px var(--line)}
+.btn.sm{padding:8px 12px;font-size:.72rem}
+textarea,input[type=text],select{background:rgba(10,10,16,.7);border-color:var(--line);color:var(--ink)}
+textarea:focus,input[type=text]:focus,select:focus{outline:none;border-color:var(--glass-edge);box-shadow:0 0 0 3px rgba(255,158,187,.12)}
+select option{background:#12121B}
+/* HUD = the site's floating glass nav */
+.hud{background:transparent;border:0;padding:10px 12px 0}
+.hud-in{background:var(--scan),var(--glass);border:1px solid var(--glass-edge);box-shadow:var(--glass-glow);backdrop-filter:blur(14px) saturate(1.3);-webkit-backdrop-filter:blur(14px) saturate(1.3);border-radius:12px;padding:8px 14px}
+.brand{font:700 1.15rem var(--dot);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.sun{background:radial-gradient(circle at 50% 70%,var(--accent) 55%,transparent 56%);border-bottom-color:var(--warn);filter:drop-shadow(0 0 6px rgba(255,158,187,.6))}
+.clock .t{font:700 1.15rem var(--dot);letter-spacing:.06em;background:rgba(0,0,0,.35);color:var(--accent);box-shadow:inset 0 0 0 1px var(--line);text-shadow:0 0 8px rgba(255,158,187,.45)}
+.clock .t.paused{background:var(--accent-soft);color:var(--warn);text-shadow:none}
+.ib{font:400 .7rem var(--mono);letter-spacing:.08em;text-transform:uppercase;background:transparent;border-color:var(--line);color:var(--ink);border-radius:8px;padding:6px 10px}
+.ib:hover{border-color:var(--glass-edge)} .ib.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.meter{font:400 .64rem var(--mono);letter-spacing:.08em;text-transform:uppercase}
+.meter b{color:var(--ink)}
+/* meters as the loader's pink block bar */
+.meter i{height:6px;border-radius:0;background:repeating-linear-gradient(90deg,rgba(255,158,187,.14) 0 5px,transparent 5px 7px)}
+.meter i u{background:repeating-linear-gradient(90deg,var(--accent) 0 5px,transparent 5px 7px)}
+/* office: the dusk room */
+.stage{padding-block:12px 40px}
+.office{background:#0B0E17;border-color:var(--glass-edge);box-shadow:var(--glass-glow)}
+.office::after{content:"";position:absolute;inset:0;pointer-events:none;background:var(--scan),radial-gradient(120% 90% at 50% 40%,transparent 60%,rgba(0,0,0,.45))}
+.where{background:var(--scan),var(--glass);border:1px solid var(--glass-edge);box-shadow:var(--glass-glow);backdrop-filter:blur(14px);color:var(--ink);font:400 .7rem var(--mono);letter-spacing:.08em;text-transform:uppercase;padding:6px 11px;border-radius:10px;left:8px;top:6px;z-index:1}
+.where::before{content:"◂ ";color:var(--accent)}
+.interact{background:var(--accent);color:var(--accent-ink);font:400 .78rem var(--mono);letter-spacing:.08em;text-transform:uppercase;border-radius:12px;padding:12px 18px;box-shadow:0 0 18px rgba(255,158,187,.45),0 10px 30px rgba(0,0,0,.4);z-index:2}
+.interact kbd{background:rgba(27,31,51,.15)}
+/* goals + phone */
+.goal .box{border-color:var(--line);border-radius:3px}
+.goal.done .box{background:var(--good);border-color:var(--good);box-shadow:0 0 8px rgba(57,255,136,.4)}
+.goal.next span{color:var(--ink)} .goal.next .box{border-color:var(--accent);box-shadow:0 0 8px rgba(255,158,187,.35)}
+.pm{border-color:var(--line);background:rgba(0,0,0,.18)}
+.pm.unread{border-color:var(--glass-edge);box-shadow:inset 3px 0 0 var(--accent)}
+.badge{background:var(--accent);color:var(--accent-ink)}
+.opt,.qcard,.idea,.ticket,.check,.pinrow,.ordlist li,.wk,.bigm div,.card-w,.idea-info,.doc,.an-chart,.pm .opt{background:rgba(0,0,0,.2);border-color:var(--line)}
+.opt:hover:not(:disabled),.qcard:hover:not(:disabled){border-color:var(--glass-edge)}
+.opt.pick{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.explain{background:var(--accent-soft);border:1px solid var(--glass-edge)}
+.explain b{color:var(--accent)}
+.say{background:rgba(255,255,255,.04)} .line .t{background:rgba(255,255,255,.05)} .line.me .t{background:var(--accent);color:var(--accent-ink)}
+.fb{font-family:var(--body)} .fb.ok{border-color:var(--good)} .fb.no{border-color:var(--bad)}
+.fb.ok::before{content:"[ OK ] ";font:400 .75rem var(--mono);color:var(--good)}
+.delta,.pill,.chips span,.ticket .pts,.qtag{font-family:var(--mono)}
+/* laptop: app list = the site's numbered nav */
+.dock{background:transparent;border-right-color:var(--line);counter-reset:app}
+.dock button{font:400 .74rem var(--mono);letter-spacing:.08em;text-transform:uppercase;color:#D9CDD0;padding:10px 12px}
+.dock button::before{counter-increment:app;content:counter(app,decimal-leading-zero);opacity:.55;margin-right:2px}
+.dock button:hover{background:rgba(255,255,255,.04)}
+.dock button.on{background:var(--accent);color:var(--accent-ink)}
+.dock button.on::before{opacity:.7}
+.dock .dot{background:var(--accent);box-shadow:0 0 8px var(--accent)}
+.dock button.on .dot{background:var(--accent-ink);box-shadow:none}
+.cal{border-color:var(--line)} .cal .hd{background:rgba(255,255,255,.03);font:400 .72rem var(--mono);letter-spacing:.08em;text-transform:uppercase}
+.cal .ev{background:rgba(255,255,255,.05)} .cal .ev.me{background:var(--accent-soft);border-color:var(--accent)}
+.zone{background:rgba(0,0,0,.25)}
+.tile{background:#0A0A10;box-shadow:inset 0 0 0 1px var(--line)}
+.toast{background:var(--accent);color:var(--accent-ink);font:400 .78rem var(--mono);letter-spacing:.06em;box-shadow:0 0 18px rgba(255,158,187,.45)}
+.coach-ring{border-color:var(--accent);box-shadow:0 0 0 9999px rgba(5,6,12,.62),0 0 18px rgba(255,158,187,.5)}
+.coach .eyebrow{color:var(--accent)}
+.keys kbd{background:rgba(255,255,255,.05);border-color:var(--line)}
+.wk h2{font-weight:600}
+.bigm b{font:700 1.9rem var(--dot);color:var(--accent);letter-spacing:.04em}
+.timer u{background:var(--accent)}
+.cap i u{background:var(--good)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 
@@ -534,30 +612,31 @@ const cv=document.getElementById("cv"), ctx=cv.getContext("2d");
 const dpr=Math.min(2,window.devicePixelRatio||1);
 cv.width=W*TS*dpr; cv.height=H*TS*dpr;
 const bgc=document.createElement("canvas"); bgc.width=W*TS; bgc.height=H*TS;
-(function paintStatic(){
+function paintStatic(){
   const g=bgc.getContext("2d");
-  const floor=(x,y)=>{ const ch=tileAt(x,y); const c={w:["#D7B98F","#CFB083"],c:["#B9C6DC","#B2C0D8"],b:["#CBBFE0","#C4B8DA"]}[ch]||["#DDE3EB","#D6DDE7"]; return c[(x+y)%2]; };
+  const floor=(x,y)=>{ const ch=tileAt(x,y); const c={w:["#3A2D25","#35291F"],c:["#3A3A48","#363644"],b:["#2E2536","#2A2232"]}[ch]||["#18181F","#15151C"]; return c[(x+y)%2]; };
   for(let y=0;y<H;y++)for(let x=0;x<W;x++){
     const ch=tileAt(x,y), px=x*TS, py=y*TS;
-    if(ch==="#"){ g.fillStyle="#2E3A52"; g.fillRect(px,py,TS,TS); g.fillStyle="#3F4D69"; g.fillRect(px,py,TS,6); continue; }
+    if(ch==="#"){ g.fillStyle="#1F1C23"; g.fillRect(px,py,TS,TS); g.fillStyle="#2B2B3C"; g.fillRect(px,py,TS,6); g.fillStyle="rgba(255,158,187,.18)"; g.fillRect(px,py+6,TS,1); continue; }
     // underlying floor: inherit from room neighbours
     let base=ch; if(["D","T","P","K","C","-"].includes(ch)){ base = y<=5 ? tileAt(1,y)==="w"&&x<8?"w": x>=9&&x<=17?"c": x>=19&&x<=21?"b":"." : "."; }
-    g.fillStyle = base==="w"?["#D7B98F","#CFB083"][(x+y)%2] : base==="c"?["#B9C6DC","#B2C0D8"][(x+y)%2] : base==="b"?["#CBBFE0","#C4B8DA"][(x+y)%2] : floor(x,y);
+    g.fillStyle = base==="w"?["#3A2D25","#35291F"][(x+y)%2] : base==="c"?["#3A3A48","#363644"][(x+y)%2] : base==="b"?["#2E2536","#2A2232"][(x+y)%2] : floor(x,y);
     g.fillRect(px,py,TS,TS);
-    if(ch==="-"){ g.fillStyle="#8C6A43"; g.fillRect(px+3,py+8,TS-6,TS-16); }
-    if(ch==="D"||ch==="C"){ g.fillStyle="#F5F2EC"; g.fillRect(px+1,py+6,TS-2,TS-10); g.strokeStyle="#9AA3B2"; g.strokeRect(px+1.5,py+6.5,TS-3,TS-11);
-      g.fillStyle=ch==="C"?"#F0A43A":"#2B3446"; g.fillRect(px+8,py+9,16,9); g.fillStyle="#2B3446"; g.fillRect(px+14,py+18,4,4); }
-    if(ch==="T"){ g.fillStyle="#8B6B4A"; g.fillRect(px,py+2,TS,TS-4); g.fillStyle="#9C7B58"; g.fillRect(px,py+2,TS,5); }
-    if(ch==="K"){ g.fillStyle="#A9B4C4"; g.fillRect(px,py+4,TS,TS-6); g.fillStyle="#7E8A9C"; g.fillRect(px,py+4,TS,4);
-      if(x===24){ g.fillStyle="#2B3446"; g.fillRect(px+8,py+8,16,16); g.fillStyle="#C2412D"; g.fillRect(px+12,py+12,4,4);} }
-    if(ch==="P"){ g.fillStyle="#B5653A"; g.fillRect(px+10,py+18,12,10); g.fillStyle="#3F8F4F"; [[16,12,9],[10,16,6],[22,15,6]].forEach(([a,b,r])=>{g.beginPath();g.arc(px+a,py+b,r,0,7);g.fill();}); }
+    if(ch==="-"){ g.fillStyle="#3B3B50"; g.fillRect(px+3,py+8,TS-6,TS-16); }
+    if(ch==="D"||ch==="C"){ g.fillStyle="#101016"; g.fillRect(px+1,py+6,TS-2,TS-10); g.fillStyle="rgba(242,194,133,.85)"; g.fillRect(px+1,py+TS-5,TS-2,1.5); g.fillStyle="rgba(242,194,133,.18)"; g.fillRect(px+1,py+TS-4,TS-2,3);
+      g.fillStyle=ch==="C"?"#FF9EBB":"#1B1F33"; g.fillRect(px+8,py+9,16,9); if(ch==="C"){ g.fillStyle="rgba(255,158,187,.25)"; g.fillRect(px+6,py+7,20,13); g.fillStyle="#FF9EBB"; g.fillRect(px+8,py+9,16,9); } g.fillStyle="#2B2B3C"; g.fillRect(px+14,py+18,4,4); }
+    if(ch==="T"){ g.fillStyle="#121218"; g.fillRect(px,py+2,TS,TS-4); g.fillStyle="#22222C"; g.fillRect(px,py+2,TS,5); g.fillStyle="rgba(242,194,133,.7)"; g.fillRect(px,py+TS-3,TS,1.5); }
+    if(ch==="K"){ g.fillStyle="#2B2B3C"; g.fillRect(px,py+4,TS,TS-6); g.fillStyle="#3B3B50"; g.fillRect(px,py+4,TS,4);
+      if(x===24){ g.fillStyle="#0A0A10"; g.fillRect(px+8,py+8,16,16); g.fillStyle="#FF9EBB"; g.fillRect(px+12,py+12,4,4);} }
+    if(ch==="P"){ g.fillStyle="#E58FB0"; g.fillRect(px+10,py+18,12,10); g.fillStyle="#3F8F4F"; [[16,12,9],[10,16,6],[22,15,6]].forEach(([a,b,r])=>{g.beginPath();g.arc(px+a,py+b,r,0,7);g.fill();}); }
   }
-  g.font="600 11px system-ui, sans-serif"; g.fillStyle="#2E3A52";
-  const lab=(s,x,y,c)=>{ g.fillStyle=c||"rgba(46,58,82,.85)"; g.fillText(s,x,y); };
+  g.font="400 10px 'Space Mono', ui-monospace, monospace"; g.fillStyle="#B9B2C4";
+  const lab=(s,x,y,c)=>{ g.fillStyle=c||"rgba(244,231,226,.5)"; g.fillText(s,x,y); };
   lab("DANA · CEO",40,50); lab("LIGHTHOUSE · MEETING ROOM",300,50); lab("BOOTH",612,50); lab("KITCHEN",822,82);
   lab("ENGINEERING",80,242); lab("DESIGN",420,242); lab("SUPPORT",642,242); lab("SALES",800,242);
   lab("YOUR DESK",382,410); lab("MAYA",560,410); lab("EXIT",842,540);
-})();
+}
+paintStatic(); if(document.fonts) document.fonts.ready.then(paintStatic); // repaint once Space Mono has loaded
 const N={}; function npcsHome(){ for(const id in NPCS){ const [x,y]=NPCS[id].home; N[id]={x:x*TS+16,y:y*TS+16,path:[],cb:null}; } }
 npcsHome();
 const P={x:26*TS+16,y:16*TS+16,path:[],pending:null};
@@ -618,19 +697,19 @@ function draw(now){
   ctx.setTransform(dpr,0,0,dpr,0,0);
   ctx.drawImage(bgc,0,0);
   const tg=targetPos(targetGoal());
-  if(tg){ const pulse=(Math.sin(now/260)+1)/2; ctx.strokeStyle=`rgba(240,164,58,${.5+pulse*.5})`; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(tg[0]*TS+16,tg[1]*TS+16,14+pulse*6,0,7); ctx.stroke(); }
+  if(tg){ const pulse=(Math.sin(now/260)+1)/2; ctx.strokeStyle=`rgba(255,158,187,${.5+pulse*.5})`; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(tg[0]*TS+16,tg[1]*TS+16,14+pulse*6,0,7); ctx.stroke(); }
   const ents=Object.keys(N).map(id=>({id,...N[id],npc:NPCS[id]})).concat([{id:"you",x:P.x,y:P.y}]).sort((a,b)=>a.y-b.y);
   for(const e of ents){
-    const isYou=e.id==="you", col=isYou?"#F0A43A":e.npc.col, skin=isYou?"#E7BE98":e.npc.skin;
-    ctx.fillStyle="rgba(0,0,0,.18)"; ctx.beginPath(); ctx.ellipse(e.x,e.y+11,10,4,0,0,7); ctx.fill();
+    const isYou=e.id==="you", col=isYou?"#FF9EBB":e.npc.col, skin=isYou?"#E7BE98":e.npc.skin;
+    ctx.fillStyle="rgba(0,0,0,.4)"; ctx.beginPath(); ctx.ellipse(e.x,e.y+11,10,4,0,0,7); ctx.fill();
     ctx.fillStyle=col; ctx.beginPath(); ctx.roundRect(e.x-11,e.y-4,22,16,7); ctx.fill();
     ctx.fillStyle=skin; ctx.beginPath(); ctx.arc(e.x,e.y-10,8.5,0,7); ctx.fill();
     const name=isYou?"You":e.npc.name.split(" ")[0];
-    ctx.font="700 11px system-ui, sans-serif"; const w=ctx.measureText(name).width+10;
-    ctx.fillStyle=isYou?"#F0A43A":"rgba(21,34,56,.88)"; ctx.beginPath(); ctx.roundRect(e.x-w/2,e.y-35,w,15,7); ctx.fill();
-    ctx.fillStyle=isYou?"#2A1B05":"#fff"; ctx.fillText(name,e.x-w/2+5,e.y-24);
-    if(!isYou&&hasNews(e.id)){ const b=Math.sin(now/200)*2; ctx.fillStyle="#F0A43A"; ctx.beginPath(); ctx.arc(e.x+15,e.y-34+b,7,0,7); ctx.fill(); ctx.fillStyle="#2A1B05"; ctx.font="800 10px system-ui"; ctx.fillText("!",e.x+13,e.y-30.5+b); }
-    if(e.id==="maya"){ ctx.fillStyle="#fff"; ctx.beginPath(); ctx.arc(e.x+15,e.y-34,7,0,7); ctx.fill(); ctx.fillStyle="#B8901A"; ctx.font="800 10px system-ui"; ctx.fillText("?",e.x+12.5,e.y-30.5); }
+    ctx.font="400 10px 'Space Mono', ui-monospace, monospace"; const w=ctx.measureText(name).width+10;
+    ctx.fillStyle=isYou?"#FF9EBB":"rgba(22,26,48,.9)"; ctx.beginPath(); ctx.roundRect(e.x-w/2,e.y-35,w,15,7); ctx.fill();
+    ctx.fillStyle=isYou?"#1B1F33":"#F4E7E2"; ctx.fillText(name,e.x-w/2+5,e.y-24);
+    if(!isYou&&hasNews(e.id)){ const b=Math.sin(now/200)*2; ctx.fillStyle="#FF9EBB"; ctx.beginPath(); ctx.arc(e.x+15,e.y-34+b,7,0,7); ctx.fill(); ctx.fillStyle="#1B1F33"; ctx.font="800 10px system-ui"; ctx.fillText("!",e.x+13,e.y-30.5+b); }
+    if(e.id==="maya"){ ctx.fillStyle="#F2C285"; ctx.beginPath(); ctx.arc(e.x+15,e.y-34,7,0,7); ctx.fill(); ctx.fillStyle="#1B1F33"; ctx.font="800 10px system-ui"; ctx.fillText("?",e.x+12.5,e.y-30.5); }
   }
 }
 
@@ -861,7 +940,7 @@ function sceneInterview(){
   const render=()=>{ const n=T.filter(x=>x.me).length;
     const cards=`<div class="cards">${QCARDS.map((c,i)=>`<button class="qcard" data-act="rq-card" data-i="${i}" ${T.some(x=>x.card===i)||n>=max?"disabled":""}>${c.q}</button>`).join("")}</div>`;
     return `<span class="eyebrow">${DAYNAMES[S.day]} ${fmt(S.min)} · Call booth</span><h2>Customer interview: Rosa Delgado</h2>
-    <div class="video"><div class="tile"><div class="av" style="background:#9C4B6E">RD</div><span>Rosa · Rosa's Studio</span></div><div class="tile"><div class="av" style="background:#F0A43A;color:#2A1B05">You</div><span>You${S.flags.priyaInvited?" + Priya":""}</span></div></div>
+    <div class="video"><div class="tile"><div class="av" style="background:#9C4B6E">RD</div><span>Rosa · Rosa's Studio</span></div><div class="tile"><div class="av" style="background:#FF9EBB;color:#1B1F33">You</div><span>You${S.flags.priyaInvited?" + Priya":""}</span></div></div>
     <div class="explain"><b>How to interview:</b> ask ${t("open","open questions")} about what actually happened ("walk me through…", "what happened when…"). Avoid ${t("leading","leading questions")} and "would you…" questions. After each answer you'll see what kind of question you asked. Click <b>📌 Pin</b> on anything important she says: pinned quotes become your notes. Questions used: <b>${n}/${max}</b>.</div>
     <div class="chat">
       <div class="line"><div class="t"><b>Rosa:</b> ${ROSA_OPEN}</div></div>
